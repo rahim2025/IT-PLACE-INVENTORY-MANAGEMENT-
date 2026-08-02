@@ -114,10 +114,21 @@ export const createDuePayment = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: { payment, due } });
 });
 
+// Supports either a single due (?due=) or every payment across all of one
+// customer's due records (?customer=), so a customer's full payment history
+// can be shown in one place instead of hunting through each due separately.
 export const listDuePayments = asyncHandler(async (req, res) => {
-  const { due } = req.query;
+  const { due, customer } = req.query;
   const filter = {};
-  if (due) filter.due = due;
-  const payments = await DuePayment.find(filter).sort({ date: -1, createdAt: -1 });
+  if (customer) {
+    const dueIds = await CustomerDue.find({ customer }).distinct("_id");
+    filter.due = { $in: dueIds };
+  } else if (due) {
+    filter.due = due;
+  }
+
+  const payments = await DuePayment.find(filter)
+    .populate({ path: "due", select: "product", populate: { path: "product", select: "name" } })
+    .sort({ date: -1, createdAt: -1 });
   res.json({ success: true, data: payments });
 });

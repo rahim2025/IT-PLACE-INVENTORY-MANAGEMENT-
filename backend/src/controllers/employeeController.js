@@ -4,57 +4,55 @@ import { EmployeeTransaction } from "../models/EmployeeTransaction.js";
 import { ApiError } from "../utils/ApiError.js";
 import { logActivity } from "../utils/logActivity.js";
 
-// Each calendar month resets to a fresh monthlySalary allotment — unused salary
-// isn't held as future credit, since it's simply paid out as normal wages. But
-// if advances/loans taken in a month exceed that month's salary, the shortfall
-// carries over and is deducted from the following month's allotment (and the
-// one after that, and so on) until it's paid off.
-function computeRemainingSalary(monthlySalary, joinDate, now, monthlyTakenByKey) {
-  let balance = 0;
-  let year = joinDate.getFullYear();
-  let month = joinDate.getMonth() + 1;
-  const endYear = now.getFullYear();
-  const endMonth = now.getMonth() + 1;
+// Salary accrues every calendar month since the employee joined and never
+// silently resets — nothing is assumed "paid via normal wages" unless the
+// owner actually records it (Advance, Payout, or Other). So remaining salary
+// is simply: (months employed × monthlySalary) − (everything ever paid).
+// Recording a Payout is what brings it back down, not the calendar.
+function monthsEmployed(joinDate, now) {
+  const months = (now.getFullYear() - joinDate.getFullYear()) * 12 + (now.getMonth() - joinDate.getMonth()) + 1;
+  return Math.max(months, 0);
+}
 
-  while (year < endYear || (year === endYear && month <= endMonth)) {
-    const taken = monthlyTakenByKey.get(`${year}-${month}`) ?? 0;
-    balance = Math.min(balance, 0) + monthlySalary - taken;
-    month += 1;
-    if (month > 12) {
-      month = 1;
-      year += 1;
-    }
-  }
-
-  return balance;
+async function getRemainingSalary(employee) {
+  const [totals] = await EmployeeTransaction.aggregate([
+    { $match: { employee: employee._id } },
+    { $group: { _id: null, amount: { $sum: "$amount" } } },
+  ]);
+  const totalPaid = totals?.amount ?? 0;
+  return monthsEmployed(employee.joinDate, new Date()) * employee.monthlySalary - totalPaid;
 }
 
 export const listEmployees = asyncHandler(async (req, res) => {
   const employees = await Employee.find().sort({ name: 1 });
 
-  const monthlyTotals = await EmployeeTransaction.aggregate([
-    {
-      $group: {
-        _id: { employee: "$employee", year: { $year: "$date" }, month: { $month: "$date" } },
-        amount: { $sum: "$amount" },
+  const [lifetimeTotals, monthlyTotals] = await Promise.all([
+    EmployeeTransaction.aggregate([{ $group: { _id: "$employee", amount: { $sum: "$amount" } } }]),
+    EmployeeTransaction.aggregate([
+      {
+        $group: {
+          _id: { employee: "$employee", year: { $year: "$date" }, month: { $month: "$date" } },
+          amount: { $sum: "$amount" },
+        },
       },
-    },
+    ]),
   ]);
 
-  const takenByEmployee = new Map();
-  for (const t of monthlyTotals) {
-    const key = String(t._id.employee);
-    if (!takenByEmployee.has(key)) takenByEmployee.set(key, new Map());
-    takenByEmployee.get(key).set(`${t._id.year}-${t._id.month}`, t.amount);
-  }
+  const totalPaidByEmployee = new Map(lifetimeTotals.map((t) => [String(t._id), t.amount]));
 
   const now = new Date();
   const currentKey = `${now.getFullYear()}-${now.getMonth() + 1}`;
+  const paidThisMonthByEmployee = new Map();
+  for (const t of monthlyTotals) {
+    if (`${t._id.year}-${t._id.month}` === currentKey) {
+      paidThisMonthByEmployee.set(String(t._id.employee), t.amount);
+    }
+  }
 
   const rows = employees.map((e) => {
-    const monthlyTaken = takenByEmployee.get(String(e._id)) ?? new Map();
-    const totalAdvance = monthlyTaken.get(currentKey) ?? 0;
-    const remainingSalary = computeRemainingSalary(e.monthlySalary, e.joinDate, now, monthlyTaken);
+    const totalAdvance = paidThisMonthByEmployee.get(String(e._id)) ?? 0;
+    const totalPaid = totalPaidByEmployee.get(String(e._id)) ?? 0;
+    const remainingSalary = monthsEmployed(e.joinDate, now) * e.monthlySalary - totalPaid;
     return { ...e.toObject(), totalAdvance, remainingSalary };
   });
 
@@ -112,6 +110,23 @@ export const createEmployeeTransaction = asyncHandler(async (req, res) => {
 
   const employee = await Employee.findById(employeeId);
   if (!employee) throw new ApiError(404, "Employee not found.");
+
+  // A Payout settles what's owed — it can't be used once the balance is
+  // already zero or negative (over-advanced), and can't exceed what's owed
+  // either. Advances/Other stay uncapped, since going negative there is the
+  // whole point: it's recovered from next month's accruing salary.
+  if (type === "Payout") {
+    const remainingSalary = await getRemainingSalary(employee);
+    if (remainingSalary <= 0) {
+      throw new ApiError(
+        400,
+        `${employee.name} has no balance owed right now — record an Advance instead if you're paying them ahead of next month's salary.`
+      );
+    }
+    if (amount > remainingSalary) {
+      throw new ApiError(400, `Payout can't exceed the $${remainingSalary.toFixed(2)} owed to ${employee.name}.`);
+    }
+  }
 
   const transaction = await EmployeeTransaction.create({
     employee: employeeId,

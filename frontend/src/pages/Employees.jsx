@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Plus, Wallet, History, Pencil, Trash2 } from "lucide-react";
+import { Plus, Wallet, Banknote, History, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Select, Input, Textarea, Label, FieldGroup, FieldError } from "../components/ui/Field";
@@ -23,7 +23,7 @@ import { pushed } from "../features/toast/toastSlice";
 import { formatCurrency, formatDate } from "../lib/format";
 
 const emptyEmployeeForm = { name: "", email: "", position: "", monthlySalary: "", joinDate: new Date().toISOString().slice(0, 10) };
-const TYPE_TONE = { Advance: "trace", Other: "neutral" };
+const TYPE_TONE = { Advance: "trace", Payout: "solder", Other: "neutral" };
 
 function EditEmployeeModal({ employee, onClose }) {
   const dispatch = useDispatch();
@@ -179,17 +179,45 @@ export default function Employees() {
     }
   }
 
+  const txEmployee = employees.find((emp) => emp._id === txEmployeeId);
+
   // Opens the transaction modal, optionally pre-selecting an employee —
   // lets clicking a name in the table skip straight past the dropdown.
   function openTransactionModal(employeeId = "") {
+    setTxType("Advance");
     setTxEmployeeId(employeeId);
+    setTxAmount("");
+    setTxNotes("");
     setTransactionModalOpen(true);
+  }
+
+  // "Pay out" is the same transaction form, pre-loaded as a Payout for
+  // whatever's still owed overall — one click to record it as cleared,
+  // or the amount can be edited for a partial payout.
+  function openPayoutModal(employee) {
+    setTxType("Payout");
+    setTxEmployeeId(employee._id);
+    setTxAmount(employee.remainingSalary > 0 ? String(Math.round(employee.remainingSalary * 100) / 100) : "");
+    setTxNotes("");
+    setTransactionModalOpen(true);
+  }
+
+  function closeTransactionModal() {
+    setTransactionModalOpen(false);
+    setTxErrors({});
   }
 
   function validateTransaction() {
     const next = {};
     if (!txEmployeeId) next.employeeId = "Choose an employee.";
     if (!txAmount || Number(txAmount) <= 0) next.amount = "Enter an amount greater than zero.";
+    if (txType === "Payout" && txEmployee && !next.amount) {
+      if (txEmployee.remainingSalary <= 0) {
+        next.amount = "Nothing is owed — record an Advance instead.";
+      } else if (Number(txAmount) > txEmployee.remainingSalary) {
+        next.amount = `Can't exceed the ${formatCurrency(txEmployee.remainingSalary)} owed.`;
+      }
+    }
     setTxErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -201,7 +229,7 @@ export default function Employees() {
     try {
       await createTransaction({ employee: txEmployeeId, type: txType, amount: Number(txAmount), notes: txNotes.trim() }).unwrap();
       dispatch(pushed({ message: `${txType} of ${formatCurrency(Number(txAmount))} recorded for ${employee?.name}.` }));
-      setTransactionModalOpen(false);
+      closeTransactionModal();
       setTxEmployeeId("");
       setTxType("Advance");
       setTxAmount("");
@@ -227,7 +255,7 @@ export default function Employees() {
     <div>
       <PageHeader
         title="Employees"
-        description={`${employees.length} people on payroll · advances and loans reduce this month's remaining salary.`}
+        description={`${employees.length} people on payroll · salary accrues monthly and builds up until a payout is recorded.`}
         action={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => openTransactionModal()}>
@@ -261,22 +289,37 @@ export default function Employees() {
                 ) },
               { key: "position", header: "Position" },
               { key: "monthlySalary", header: "Monthly salary", align: "right", mono: true, render: (r) => formatCurrency(r.monthlySalary) },
-              { key: "totalAdvance", header: "This month's advances/loans", align: "right", mono: true, render: (r) => formatCurrency(r.totalAdvance) },
+              { key: "totalAdvance", header: "Paid out this month", align: "right", mono: true, render: (r) => formatCurrency(r.totalAdvance) },
               {
                 key: "remainingSalary",
-                header: "Remaining this month",
+                header: "Balance owed",
                 align: "right",
-                render: (r) => (
-                  <AssetTag tone={r.remainingSalary < 0 ? "fault" : r.remainingSalary < r.monthlySalary * 0.5 ? "trace" : "solder"}>
-                    {formatCurrency(r.remainingSalary)}
-                  </AssetTag>
-                ),
+                render: (r) =>
+                  r.remainingSalary <= 0 ? (
+                    <AssetTag tone={r.remainingSalary < 0 ? "fault" : "solder"}>
+                      {r.remainingSalary < 0 ? formatCurrency(r.remainingSalary) : "Settled"}
+                    </AssetTag>
+                  ) : (
+                    // Owed builds up until a Payout is recorded, so more owed reads
+                    // worse the bigger it gets relative to one month's salary.
+                    <AssetTag tone={r.remainingSalary >= r.monthlySalary ? "fault" : r.remainingSalary >= r.monthlySalary * 0.5 ? "trace" : "solder"}>
+                      {formatCurrency(r.remainingSalary)}
+                    </AssetTag>
+                  ),
               },
               {
                 key: "actions",
                 header: "",
                 render: (r) => (
                   <div className="flex items-center justify-end gap-3">
+                    {r.remainingSalary > 0 && (
+                      <button
+                        onClick={() => openPayoutModal(r)}
+                        className="inline-flex items-center gap-1 text-[12.5px] font-medium text-solder hover:underline"
+                      >
+                        <Banknote size={13} /> Pay out
+                      </button>
+                    )}
                     <button
                       onClick={() => setHistoryEmployeeId(r._id)}
                       className="inline-flex items-center gap-1 text-[12.5px] font-medium text-rose hover:underline"
@@ -314,7 +357,7 @@ export default function Employees() {
       <Card>
         <CardHeader
           title="Transactions"
-          description={historyEmployee ? `Showing all records for ${historyEmployee.name}.` : "Salary advances, loans, and other payments across the team."}
+          description={historyEmployee ? `Showing all records for ${historyEmployee.name}.` : "Salary advances, payouts, and other payments across the team."}
         />
         {transactionsLoading ? (
           <SkeletonRows rows={7} cols={5} />
@@ -338,7 +381,7 @@ export default function Employees() {
             rows={transactions}
             keyField="_id"
             pageSize={9}
-            emptyState={<EmptyState icon={Wallet} title="No transactions" description="Advances, loans, and other payments will appear here." />}
+            emptyState={<EmptyState icon={Wallet} title="No transactions" description="Advances, payouts, and other payments will appear here." />}
           />
         )}
       </Card>
@@ -376,11 +419,26 @@ export default function Employees() {
         </form>
       </Modal>
 
-      <Modal open={transactionModalOpen} onClose={() => setTransactionModalOpen(false)} title="Add employee transaction">
+      <Modal
+        open={transactionModalOpen}
+        onClose={closeTransactionModal}
+        title={txType === "Payout" ? "Record salary payout" : "Add employee transaction"}
+        description={txType === "Payout" ? "Marks this much of the month's salary as paid out." : undefined}
+      >
         <form onSubmit={handleTransactionSubmit} className="space-y-4">
           <FieldGroup>
             <Label htmlFor="tx-employee">Employee</Label>
-            <Select id="tx-employee" value={txEmployeeId} onChange={(e) => setTxEmployeeId(e.target.value)}>
+            <Select
+              id="tx-employee"
+              value={txEmployeeId}
+              onChange={(e) => {
+                const nextEmployee = employees.find((emp) => emp._id === e.target.value);
+                setTxEmployeeId(e.target.value);
+                if (txType === "Payout" && (!nextEmployee || nextEmployee.remainingSalary <= 0)) {
+                  setTxType("Advance");
+                }
+              }}
+            >
               <option value="">Select an employee</option>
               {employees.map((emp) => (
                 <option key={emp._id} value={emp._id}>{emp.name}</option>
@@ -392,12 +450,29 @@ export default function Employees() {
             <Label htmlFor="tx-type">Type</Label>
             <Select id="tx-type" value={txType} onChange={(e) => setTxType(e.target.value)}>
               <option>Advance</option>
+              <option value="Payout" disabled={!!txEmployee && txEmployee.remainingSalary <= 0}>
+                Payout{txEmployee && txEmployee.remainingSalary <= 0 ? " (nothing owed)" : ""}
+              </option>
               <option>Other</option>
             </Select>
           </FieldGroup>
           <FieldGroup>
-            <Label htmlFor="tx-amount">Amount</Label>
-            <Input id="tx-amount" type="number" min="0" step="0.01" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} placeholder="0.00" />
+            <Label
+              htmlFor="tx-amount"
+              hint={txEmployee ? `Balance owed: ${formatCurrency(txEmployee.remainingSalary)}` : undefined}
+            >
+              Amount
+            </Label>
+            <Input
+              id="tx-amount"
+              type="number"
+              min="0"
+              step="0.01"
+              max={txType === "Payout" && txEmployee ? Math.max(txEmployee.remainingSalary, 0) : undefined}
+              value={txAmount}
+              onChange={(e) => setTxAmount(e.target.value)}
+              placeholder="0.00"
+            />
             <FieldError>{txErrors.amount}</FieldError>
           </FieldGroup>
           <FieldGroup>
@@ -405,7 +480,7 @@ export default function Employees() {
             <Textarea id="tx-notes" value={txNotes} onChange={(e) => setTxNotes(e.target.value)} placeholder="Repayment terms, reason, etc." />
           </FieldGroup>
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="secondary" onClick={() => setTransactionModalOpen(false)}>Cancel</Button>
+            <Button type="button" variant="secondary" onClick={closeTransactionModal}>Cancel</Button>
             <Button type="submit" disabled={savingTransaction}>{savingTransaction ? "Saving…" : "Save transaction"}</Button>
           </div>
         </form>

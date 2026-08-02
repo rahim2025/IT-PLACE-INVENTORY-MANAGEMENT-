@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { useSearchParams } from "react-router-dom";
-import { Plus, HandCoins, Pencil, Trash2 } from "lucide-react";
+import { Plus, HandCoins, History, Pencil, Trash2 } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { Select, Input, Textarea, Label, FieldGroup, FieldError } from "../components/ui/Field";
@@ -331,6 +331,110 @@ function PaymentModal({ due, onClose }) {
   );
 }
 
+// Consolidated view for one customer — every due record they have and every
+// payment they've ever made, in one place, with a way to record a new
+// payment right from here instead of hunting for the right row in the table.
+function CustomerHistoryModal({ customer, onClose, onRecordPayment }) {
+  const { data: duesRes, isLoading: duesLoading } = useGetDuesQuery(
+    { customer: customer?._id, limit: 200 },
+    { skip: !customer }
+  );
+  const { data: paymentsRes, isLoading: paymentsLoading } = useGetDuePaymentsQuery(
+    { customer: customer?._id },
+    { skip: !customer }
+  );
+
+  if (!customer) return null;
+
+  const dues = duesRes?.data ?? [];
+  const payments = paymentsRes?.data ?? [];
+  const totalDue = dues.reduce((s, d) => s + d.dueAmount, 0);
+  const totalPaid = dues.reduce((s, d) => s + d.paidAmount, 0);
+  const totalRemaining = dues.reduce((s, d) => s + d.remainingDue, 0);
+
+  return (
+    <Modal open={!!customer} onClose={onClose} title={customer.name} description={customer.email || undefined} size="lg">
+      <div className="space-y-5">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-[6px] border border-border bg-bg-sunken px-3 py-2.5">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Total due</p>
+            <p className="mt-1 font-mono text-[15px] font-semibold text-text">{formatCurrency(totalDue)}</p>
+          </div>
+          <div className="rounded-[6px] border border-border bg-bg-sunken px-3 py-2.5">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Total paid</p>
+            <p className="mt-1 font-mono text-[15px] font-semibold text-solder">{formatCurrency(totalPaid)}</p>
+          </div>
+          <div className="rounded-[6px] border border-border bg-bg-sunken px-3 py-2.5">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Outstanding</p>
+            <p className={`mt-1 font-mono text-[15px] font-semibold ${totalRemaining > 0 ? "text-rose" : "text-solder"}`}>
+              {formatCurrency(totalRemaining)}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Due records</p>
+          {duesLoading ? (
+            <SkeletonRows rows={2} cols={4} />
+          ) : dues.length === 0 ? (
+            <p className="text-[13px] text-text-muted">No due records for this customer yet.</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-[6px] border border-border">
+              {dues.map((d) => (
+                <li key={d._id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] text-text">{d.product?.name ?? "General due"}</p>
+                    <p className="text-[11.5px] text-text-faint">
+                      {formatDate(d.date)} · {formatCurrency(d.dueAmount)} due
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2.5">
+                    <AssetTag tone={STATUS_TONE[d.status]}>{d.status}</AssetTag>
+                    {d.remainingDue > 0 && (
+                      <button
+                        onClick={() => onRecordPayment(d)}
+                        className="text-[12.5px] font-medium text-rose hover:underline"
+                      >
+                        Record payment
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Payment history</p>
+          {paymentsLoading ? (
+            <SkeletonRows rows={3} cols={3} />
+          ) : payments.length === 0 ? (
+            <p className="text-[13px] text-text-muted">No payments recorded yet.</p>
+          ) : (
+            <ul className="max-h-60 space-y-1.5 overflow-y-auto rounded-[6px] border border-border bg-bg-sunken p-2.5">
+              {payments.map((p) => (
+                <li key={p._id} className="flex items-center justify-between gap-3 text-[12.5px]">
+                  <span className="min-w-0 truncate text-text-muted">
+                    {formatDate(p.date)}
+                    {p.due?.product?.name ? ` · ${p.due.product.name}` : ""}
+                    {p.notes ? ` · ${p.notes}` : ""}
+                  </span>
+                  <span className="shrink-0 font-mono text-text">{formatCurrency(p.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <Button type="button" variant="secondary" onClick={onClose}>Close</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function DueRecords() {
   const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
@@ -348,6 +452,14 @@ export default function DueRecords() {
   const [editingDueId, setEditingDueId] = useState(null);
   const [deletingDueId, setDeletingDueId] = useState(null);
   const [deleteError, setDeleteError] = useState("");
+  const [historyCustomer, setHistoryCustomer] = useState(null);
+
+  // Opens the payment modal for one specific due from inside the customer
+  // history view, swapping that modal out for this one.
+  function recordPaymentFromHistory(due) {
+    setHistoryCustomer(null);
+    setActiveDueId(due._id);
+  }
 
   const rows = useMemo(
     () =>
@@ -430,7 +542,23 @@ export default function DueRecords() {
               </>
             }
             columns={[
-              { key: "customer", header: "Customer", render: (r) => r.customer?.name ?? "—" },
+              {
+                key: "customer",
+                header: "Customer",
+                render: (r) =>
+                  r.customer ? (
+                    <button
+                      type="button"
+                      onClick={() => setHistoryCustomer(r.customer)}
+                      className="inline-flex items-center gap-1 font-medium text-text hover:underline"
+                    >
+                      <History size={12} className="text-text-faint" />
+                      {r.customer.name}
+                    </button>
+                  ) : (
+                    "—"
+                  ),
+              },
               { key: "productLabel", header: "Product", render: (r) => <span className="text-[12.5px] text-text-muted">{r.productLabel || "—"}</span> },
               { key: "dueAmount", header: "Due", align: "right", mono: true, render: (r) => formatCurrency(r.dueAmount) },
               { key: "paidAmount", header: "Paid", align: "right", mono: true, render: (r) => formatCurrency(r.paidAmount) },
@@ -479,6 +607,11 @@ export default function DueRecords() {
       <AddDueModal open={addOpen} onClose={() => setAddOpen(false)} />
       <PaymentModal due={activeDue} onClose={() => setActiveDueId(null)} />
       <EditDueModal key={editingDueId} due={editingDue} onClose={() => setEditingDueId(null)} />
+      <CustomerHistoryModal
+        customer={historyCustomer}
+        onClose={() => setHistoryCustomer(null)}
+        onRecordPayment={recordPaymentFromHistory}
+      />
 
       <ConfirmDialog
         open={!!deletingDue}

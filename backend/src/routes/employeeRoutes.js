@@ -32,7 +32,7 @@ router.post(
   authorize("owner"),
   [
     body("employee").isMongoId().withMessage("Choose a valid employee."),
-    body("type").isIn(["Advance", "Other"]).withMessage("Choose a valid transaction type."),
+    body("type").isIn(["Advance", "Payout", "Other"]).withMessage("Choose a valid transaction type."),
     body("amount").isFloat({ min: 0.01 }).withMessage("Enter an amount greater than zero."),
   ],
   validate,
