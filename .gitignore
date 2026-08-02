@@ -1,0 +1,11 @@
+# Claude Code project instructions — not meant to be shared/committed
+CLAUDE.md
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
