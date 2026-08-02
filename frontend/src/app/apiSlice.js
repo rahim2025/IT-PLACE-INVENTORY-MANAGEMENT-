@@ -4,6 +4,10 @@ const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api";
 
 export const api = createApi({
   reducerPath: "api",
+  // Default is 60s — bumped so switching between pages you've already
+  // visited this session reuses cached data instead of re-fetching and
+  // showing the skeleton loader again every time.
+  keepUnusedDataFor: 300,
   baseQuery: fetchBaseQuery({
     baseUrl,
     prepareHeaders: (headers, { getState }) => {
