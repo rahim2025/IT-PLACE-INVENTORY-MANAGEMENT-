@@ -11,7 +11,7 @@ const supplierRules = [
   body("email").optional({ values: "falsy" }).isEmail().withMessage("Enter a valid email."),
 ];
 
-router.get("/", protect, listSuppliers);
+router.get("/", protect, authorize("owner", "employee"), listSuppliers);
 router.post("/", protect, authorize("owner"), supplierRules, validate, createSupplier);
 router.patch("/:id", protect, authorize("owner"), supplierRules, validate, updateSupplier);
 

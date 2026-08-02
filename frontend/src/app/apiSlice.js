@@ -33,9 +33,13 @@ export const api = createApi({
     "ActivityLog",
     "Settings",
     "Me",
+    "Account",
   ],
   endpoints: (builder) => ({
     // --- auth ---
+    signup: builder.mutation({
+      query: (body) => ({ url: "/auth/signup", method: "POST", body }),
+    }),
     login: builder.mutation({
       query: (credentials) => ({ url: "/auth/login", method: "POST", body: credentials }),
     }),
@@ -270,10 +274,25 @@ export const api = createApi({
       query: (body) => ({ url: "/settings", method: "PATCH", body }),
       invalidatesTags: ["Settings", "Inventory", "Dashboard", "ActivityLog"],
     }),
+
+    // --- users (account management) ---
+    getUsers: builder.query({
+      query: () => "/users",
+      providesTags: ["Account"],
+    }),
+    updateUserRole: builder.mutation({
+      query: ({ id, role }) => ({ url: `/users/${id}/role`, method: "PATCH", body: { role } }),
+      invalidatesTags: ["Account", "ActivityLog"],
+    }),
+    deleteUser: builder.mutation({
+      query: (id) => ({ url: `/users/${id}`, method: "DELETE" }),
+      invalidatesTags: ["Account", "ActivityLog"],
+    }),
   }),
 });
 
 export const {
+  useSignupMutation,
   useLoginMutation,
   useGetMeQuery,
   useLazyGetMeQuery,
@@ -329,4 +348,7 @@ export const {
   useGetActivityLogsQuery,
   useGetSettingsQuery,
   useUpdateSettingsMutation,
+  useGetUsersQuery,
+  useUpdateUserRoleMutation,
+  useDeleteUserMutation,
 } = api;

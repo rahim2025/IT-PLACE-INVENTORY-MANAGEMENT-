@@ -22,6 +22,10 @@ export const env = {
     email: process.env.SEED_OWNER_EMAIL ?? "owner@itplace.shop",
     password: process.env.SEED_OWNER_PASSWORD ?? "ChangeMe123!",
   },
+  email: {
+    user: process.env.EMAIL_USER,
+    appPassword: process.env.APP_PASSWORD,
+  },
 };
 
 export const isProduction = env.nodeEnv === "production";

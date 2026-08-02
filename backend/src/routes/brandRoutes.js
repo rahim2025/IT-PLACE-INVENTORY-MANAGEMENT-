@@ -8,8 +8,9 @@ const router = Router();
 
 const nameRule = [body("name").trim().notEmpty().withMessage("Brand name is required.")];
 
-router.get("/", protect, listBrands);
-router.post("/", protect, authorize("owner"), nameRule, validate, createBrand);
+router.get("/", protect, authorize("owner", "employee"), listBrands);
+// Employees create brands on the fly when adding a product — editing/deleting stays owner-only.
+router.post("/", protect, authorize("owner", "employee"), nameRule, validate, createBrand);
 router.patch("/:id", protect, authorize("owner"), nameRule, validate, updateBrand);
 router.delete("/:id", protect, authorize("owner"), deleteBrand);
 

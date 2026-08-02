@@ -33,6 +33,15 @@ const authSlice = createSlice({
       .addMatcher(api.endpoints.login.matchRejected, (state, action) => {
         state.error = action.payload?.data?.message ?? "Sign-in failed. Try again.";
       })
+      .addMatcher(api.endpoints.signup.matchFulfilled, (state, action) => {
+        state.token = action.payload.data.token;
+        state.user = action.payload.data.user;
+        state.error = null;
+        localStorage.setItem(TOKEN_KEY, action.payload.data.token);
+      })
+      .addMatcher(api.endpoints.signup.matchRejected, (state, action) => {
+        state.error = action.payload?.data?.message ?? "Sign-up failed. Try again.";
+      })
       .addMatcher(api.endpoints.getMe.matchFulfilled, (state, action) => {
         state.user = action.payload.data;
       })
@@ -52,5 +61,6 @@ export const { loggedOut, authErrorCleared } = authSlice.actions;
 export const selectAuth = (state) => state.auth;
 export const selectIsAuthenticated = (state) => Boolean(state.auth.token);
 export const selectIsOwner = (state) => state.auth.user?.role === "owner";
+export const selectIsPendingAccess = (state) => state.auth.user?.role === "user";
 
 export default authSlice.reducer;

@@ -8,8 +8,9 @@ const router = Router();
 
 const nameRule = [body("name").trim().notEmpty().withMessage("Category name is required.")];
 
-router.get("/", protect, listCategories);
-router.post("/", protect, authorize("owner"), nameRule, validate, createCategory);
+router.get("/", protect, authorize("owner", "employee"), listCategories);
+// Employees create categories on the fly when adding a product — editing/deleting stays owner-only.
+router.post("/", protect, authorize("owner", "employee"), nameRule, validate, createCategory);
 router.patch("/:id", protect, authorize("owner"), nameRule, validate, updateCategory);
 router.delete("/:id", protect, authorize("owner"), deleteCategory);
 

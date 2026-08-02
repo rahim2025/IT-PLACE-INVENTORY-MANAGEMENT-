@@ -3,6 +3,36 @@ import { User } from "../models/User.js";
 import { generateToken } from "../utils/generateToken.js";
 import { ApiError } from "../utils/ApiError.js";
 import { logActivity } from "../utils/logActivity.js";
+import { sendEmail } from "../utils/sendEmail.js";
+
+// Public: anyone can create an account, but it always starts as role "user"
+// — no access to any shop data until an owner promotes them from the Users
+// page. The role in the request body (if any) is ignored on purpose.
+export const signup = asyncHandler(async (req, res) => {
+  const { name, email, password } = req.body;
+
+  const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing) {
+    throw new ApiError(409, "An account with that email already exists.");
+  }
+
+  const user = await User.create({ name, email: email.toLowerCase(), password, role: "user" });
+  await logActivity({ user, action: "Signed up", target: user.name });
+
+  const owners = await User.find({ role: "owner", isActive: true }).select("email");
+  await Promise.all(
+    owners.map((owner) =>
+      sendEmail({
+        to: owner.email,
+        subject: "New signup — IT Place Inventory",
+        text: `${user.name} (${user.email}) just signed up and is waiting for access.\n\nGrant them employee access from the Users page if this is expected.`,
+      })
+    )
+  );
+
+  const token = generateToken(user);
+  res.status(201).json({ success: true, data: { user, token } });
+});
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;

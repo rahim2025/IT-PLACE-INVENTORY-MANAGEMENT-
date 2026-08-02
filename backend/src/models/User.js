@@ -6,7 +6,9 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, select: false, minlength: 8 },
-    role: { type: String, enum: ["owner", "employee"], default: "employee" },
+    // "user" = signed up but not yet granted access to anything — the owner
+    // promotes them to "employee" (or "owner") from the Users page.
+    role: { type: String, enum: ["user", "employee", "owner"], default: "user" },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

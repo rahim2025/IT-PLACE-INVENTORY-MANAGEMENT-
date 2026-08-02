@@ -6,7 +6,7 @@ import { validate } from "../middleware/validate.js";
 
 const router = Router();
 
-router.get("/", protect, getSettings);
+router.get("/", protect, authorize("owner", "employee"), getSettings);
 router.patch(
   "/",
   protect,

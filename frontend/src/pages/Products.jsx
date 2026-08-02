@@ -152,6 +152,7 @@ export default function Products() {
   const dispatch = useDispatch();
   const { user } = useSelector(selectAuth);
   const isOwner = user?.role === "owner";
+  const canAddProduct = user?.role === "owner" || user?.role === "employee";
 
   const { data: productsRes, isLoading } = useGetProductsQuery({ limit: 200 });
   const { data: categoriesRes } = useGetCategoriesQuery();
@@ -208,7 +209,7 @@ export default function Products() {
         title="Products"
         description={`${products.length} products in the catalog · stock and cost update automatically from purchases.`}
         action={
-          isOwner && (
+          canAddProduct && (
             <Link to="/products/new">
               <Button>
                 <Plus size={16} /> Add product

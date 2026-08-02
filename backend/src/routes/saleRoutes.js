@@ -1,15 +1,16 @@
 import { Router } from "express";
 import { body } from "express-validator";
 import { listSales, createSale } from "../controllers/saleController.js";
-import { protect } from "../middleware/auth.js";
+import { protect, authorize } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
 
 const router = Router();
 
-router.get("/", protect, listSales);
+router.get("/", protect, authorize("owner", "employee"), listSales);
 router.post(
   "/",
   protect,
+  authorize("owner", "employee"),
   [
     body("items").isArray({ min: 1 }).withMessage("Add at least one product."),
     body("items.*.product").isMongoId().withMessage("Choose a valid product for each item."),

@@ -12,6 +12,7 @@ import {
   Percent,
   FileBarChart2,
   Settings,
+  UserCog,
 } from "lucide-react";
 
 export const NAV_GROUPS = [
@@ -35,6 +36,7 @@ export const NAV_GROUPS = [
   {
     label: "People",
     items: [
+      { label: "Users", to: "/users", icon: UserCog, roles: ["owner"] },
       { label: "Employees", to: "/employees", icon: Users, roles: ["owner"] },
       { label: "Brokers", to: "/brokers", icon: Handshake, roles: ["owner"] },
     ],

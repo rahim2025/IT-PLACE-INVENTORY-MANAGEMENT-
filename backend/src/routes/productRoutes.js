@@ -25,9 +25,10 @@ const updateProductRules = [
   body("supplier").optional({ values: "falsy" }).isMongoId().withMessage("Choose a valid supplier."),
 ];
 
-router.get("/", protect, listProducts);
-router.get("/:id", protect, getProduct);
-router.post("/", protect, authorize("owner"), createProductRules, validate, createProduct);
+router.get("/", protect, authorize("owner", "employee"), listProducts);
+router.get("/:id", protect, authorize("owner", "employee"), getProduct);
+// Employees can add new products too — editing/deleting stays owner-only.
+router.post("/", protect, authorize("owner", "employee"), createProductRules, validate, createProduct);
 router.patch("/:id", protect, authorize("owner"), updateProductRules, validate, updateProduct);
 router.delete("/:id", protect, authorize("owner"), deleteProduct);
 

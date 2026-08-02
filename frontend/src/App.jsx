@@ -6,8 +6,11 @@ import AppShell from "./components/layout/AppShell";
 import AuthGate from "./components/layout/AuthGate";
 import ProtectedRoute from "./components/layout/ProtectedRoute";
 import RoleRoute from "./components/layout/RoleRoute";
+import AccessGate from "./components/layout/AccessGate";
 
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import PendingAccess from "./pages/PendingAccess";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
 import AddProduct from "./pages/AddProduct";
@@ -22,6 +25,7 @@ import DueRecords from "./pages/DueRecords";
 import BrandCommission from "./pages/BrandCommission";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -36,26 +40,35 @@ export default function App() {
     <AuthGate>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
 
         <Route element={<ProtectedRoute />}>
-          <Route element={<AppShell />}>
-            <Route index element={<Dashboard />} />
-            <Route path="products" element={<Products />} />
-            <Route path="purchases/new" element={<PurchaseEntry />} />
-            <Route path="purchases" element={<PurchaseHistory />} />
-            <Route path="sales" element={<SaleUpdate />} />
-            <Route path="inventory" element={<Inventory />} />
-            <Route path="profile" element={<Profile />} />
+          <Route path="/pending" element={<PendingAccess />} />
 
-            <Route element={<RoleRoute roles={["owner"]} />}>
-              <Route path="products/new" element={<AddProduct />} />
-              <Route path="employees" element={<Employees />} />
-              <Route path="brokers" element={<Brokers />} />
-              <Route path="expenses" element={<Expenses />} />
-              <Route path="customers/dues" element={<DueRecords />} />
-              <Route path="brand-commission" element={<BrandCommission />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="settings" element={<Settings />} />
+          <Route element={<AccessGate />}>
+            <Route element={<AppShell />}>
+              <Route index element={<Dashboard />} />
+              <Route path="products" element={<Products />} />
+              <Route path="purchases/new" element={<PurchaseEntry />} />
+              <Route path="purchases" element={<PurchaseHistory />} />
+              <Route path="sales" element={<SaleUpdate />} />
+              <Route path="inventory" element={<Inventory />} />
+              <Route path="profile" element={<Profile />} />
+
+              <Route element={<RoleRoute roles={["owner", "employee"]} />}>
+                <Route path="products/new" element={<AddProduct />} />
+              </Route>
+
+              <Route element={<RoleRoute roles={["owner"]} />}>
+                <Route path="employees" element={<Employees />} />
+                <Route path="brokers" element={<Brokers />} />
+                <Route path="expenses" element={<Expenses />} />
+                <Route path="customers/dues" element={<DueRecords />} />
+                <Route path="brand-commission" element={<BrandCommission />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="settings" element={<Settings />} />
+                <Route path="users" element={<Users />} />
+              </Route>
             </Route>
           </Route>
         </Route>
