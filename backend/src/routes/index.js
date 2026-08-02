@@ -1,0 +1,40 @@
+import { Router } from "express";
+import authRoutes from "./authRoutes.js";
+import productRoutes from "./productRoutes.js";
+import categoryRoutes from "./categoryRoutes.js";
+import brandRoutes from "./brandRoutes.js";
+import supplierRoutes from "./supplierRoutes.js";
+import purchaseRoutes from "./purchaseRoutes.js";
+import saleRoutes from "./saleRoutes.js";
+import inventoryRoutes from "./inventoryRoutes.js";
+import employeeRoutes from "./employeeRoutes.js";
+import brokerRoutes from "./brokerRoutes.js";
+import expenseRoutes from "./expenseRoutes.js";
+import customerRoutes from "./customerRoutes.js";
+import customerDueRoutes from "./customerDueRoutes.js";
+import dashboardRoutes from "./dashboardRoutes.js";
+import reportRoutes from "./reportRoutes.js";
+import activityLogRoutes from "./activityLogRoutes.js";
+import settingsRoutes from "./settingsRoutes.js";
+
+const router = Router();
+
+router.use("/auth", authRoutes);
+router.use("/products", productRoutes);
+router.use("/categories", categoryRoutes);
+router.use("/brands", brandRoutes);
+router.use("/suppliers", supplierRoutes);
+router.use("/purchases", purchaseRoutes);
+router.use("/sales", saleRoutes);
+router.use("/inventory", inventoryRoutes);
+router.use("/employees", employeeRoutes);
+router.use("/brokers", brokerRoutes);
+router.use("/expenses", expenseRoutes);
+router.use("/customers", customerRoutes);
+router.use("/dues", customerDueRoutes);
+router.use("/dashboard", dashboardRoutes);
+router.use("/reports", reportRoutes);
+router.use("/activity-logs", activityLogRoutes);
+router.use("/settings", settingsRoutes);
+
+export default router;
