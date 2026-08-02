@@ -16,7 +16,14 @@ export const env = {
   mongoUri: required("MONGO_URI", "mongodb://127.0.0.1:27017/it_place_inventory"),
   jwtSecret: required("JWT_SECRET", "dev-only-secret-change-me"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
-  clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5183",
+  // Comma-separated list, e.g. "https://itplace.shop,https://www.itplace.shop"
+  // — a browser sends only one Origin header per request, so both the bare
+  // and www. domains must be listed explicitly if you want visitors to reach
+  // the site either way.
+  clientOrigins: (process.env.CLIENT_ORIGIN ?? "http://localhost:5183")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   seedOwner: {
     name: process.env.SEED_OWNER_NAME ?? "Owner Account",
     email: process.env.SEED_OWNER_EMAIL ?? "owner@itplace.shop",

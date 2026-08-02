@@ -14,7 +14,14 @@ const app = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: env.clientOrigin,
+    origin(origin, callback) {
+      // No Origin header (curl, server-to-server, health checks) — allow.
+      if (!origin || env.clientOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
@@ -23,6 +30,10 @@ app.use(express.json({ limit: "2mb" }));
 app.use(mongoSanitize());
 app.use(morgan(isProduction ? "combined" : "dev"));
 app.use("/api", apiLimiter);
+
+app.get("/", (req, res) => {
+  res.json({ success: true, message: "IT Place Inventory API is running." });
+});
 
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "IT Place Inventory API is running." });
