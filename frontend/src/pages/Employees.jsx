@@ -48,7 +48,6 @@ function EditEmployeeModal({ employee, onClose }) {
   function validate() {
     const next = {};
     if (!form.name.trim()) next.name = "Name is required.";
-    if (!form.email.trim()) next.email = "Email is required.";
     if (!form.position.trim()) next.position = "Position is required.";
     if (!form.monthlySalary || Number(form.monthlySalary) <= 0) next.monthlySalary = "Enter a monthly salary.";
     setErrors(next);
@@ -84,7 +83,7 @@ function EditEmployeeModal({ employee, onClose }) {
           <FieldError>{errors.name}</FieldError>
         </FieldGroup>
         <FieldGroup>
-          <Label htmlFor="edit-emp-email">Email</Label>
+          <Label htmlFor="edit-emp-email" hint="optional">Email</Label>
           <Input id="edit-emp-email" type="email" value={form.email} onChange={(e) => update("email", e.target.value)} placeholder="name@itplace.shop" />
           <FieldError>{errors.email}</FieldError>
         </FieldGroup>
@@ -153,7 +152,6 @@ export default function Employees() {
   function validateEmployee() {
     const next = {};
     if (!employeeForm.name.trim()) next.name = "Name is required.";
-    if (!employeeForm.email.trim()) next.email = "Email is required.";
     if (!employeeForm.position.trim()) next.position = "Position is required.";
     if (!employeeForm.monthlySalary || Number(employeeForm.monthlySalary) <= 0) next.monthlySalary = "Enter a monthly salary.";
     setEmployeeErrors(next);
@@ -292,7 +290,7 @@ export default function Employees() {
               { key: "totalAdvance", header: "Paid out this month", align: "right", mono: true, render: (r) => formatCurrency(r.totalAdvance) },
               {
                 key: "remainingSalary",
-                header: "Balance owed",
+                header: "Remaining salary",
                 align: "right",
                 render: (r) =>
                   r.remainingSalary <= 0 ? (
@@ -394,7 +392,7 @@ export default function Employees() {
             <FieldError>{employeeErrors.name}</FieldError>
           </FieldGroup>
           <FieldGroup>
-            <Label htmlFor="emp-email">Email</Label>
+            <Label htmlFor="emp-email" hint="optional">Email</Label>
             <Input id="emp-email" type="email" value={employeeForm.email} onChange={(e) => updateEmployeeField("email", e.target.value)} placeholder="name@itplace.shop" />
             <FieldError>{employeeErrors.email}</FieldError>
           </FieldGroup>

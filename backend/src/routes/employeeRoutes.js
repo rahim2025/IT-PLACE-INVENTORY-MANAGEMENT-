@@ -15,7 +15,7 @@ const router = Router();
 
 const employeeRules = [
   body("name").trim().notEmpty().withMessage("Name is required."),
-  body("email").isEmail().withMessage("Enter a valid email."),
+  body("email").optional({ values: "falsy" }).isEmail().withMessage("Enter a valid email."),
   body("position").trim().notEmpty().withMessage("Position is required."),
   body("monthlySalary").isFloat({ min: 0 }).withMessage("Enter a monthly salary."),
 ];

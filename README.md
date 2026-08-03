@@ -20,7 +20,6 @@ Two independent apps in one repo, no shared package or monorepo tooling:
 cd backend
 npm install
 cp .env.example .env   # then fill in MONGO_URI, JWT_SECRET, etc.
-npm run seed            # optional — wipes and repopulates the DB with sample data
 npm run dev              # starts the API on the port set in .env
 ```
 
@@ -40,7 +39,7 @@ Run both dev servers at the same time, in separate terminals. Make sure:
 
 ### 3. Log in
 
-If you ran `npm run seed`, an owner account is created using the credentials from `backend/.env` (`SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD`).
+There's no seed script — `POST /api/auth/signup` always creates accounts with role `"user"` (no access until promoted), and `POST /api/auth/register` (which can create an `"owner"`) is itself owner-only. On a fresh database, sign up once via the app, then manually set that user's `role` to `"owner"` directly in MongoDB to bootstrap the first account.
 
 ## Commands
 
@@ -50,8 +49,6 @@ If you ran `npm run seed`, an owner account is created using the credentials fro
 |---|---|
 | `npm run dev` | Start the API with nodemon |
 | `npm start` | Start the API without nodemon |
-| `npm run seed` | Wipe and repopulate the DB with realistic fixture data (safe to re-run) |
-| `npm run seed:destroy` | Wipe fixture data only |
 
 **Frontend** (`frontend/`)
 

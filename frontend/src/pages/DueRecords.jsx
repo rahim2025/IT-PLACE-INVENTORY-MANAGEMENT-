@@ -109,7 +109,7 @@ function AddDueModal({ open, onClose }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldGroup>
-            <Label htmlFor="due-customer-name" hint="type to add new">Customer name</Label>
+            <Label htmlFor="due-customer-name" hint="type to add new">Customer or Company name</Label>
             <Input
               id="due-customer-name"
               list="due-customer-options"
@@ -525,7 +525,7 @@ export default function DueRecords() {
         ) : (
           <DataTable
             searchKeys={["customerName"]}
-            searchPlaceholder="Search by customer name…"
+            searchPlaceholder="Search by customer/company"
             filters={
               <>
                 <Select value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)} className="!h-8.5 w-44 !text-[13px]">
@@ -544,7 +544,7 @@ export default function DueRecords() {
             columns={[
               {
                 key: "customer",
-                header: "Customer",
+                header: "Customer/Company",
                 render: (r) =>
                   r.customer ? (
                     <button

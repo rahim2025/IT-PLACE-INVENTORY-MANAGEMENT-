@@ -24,11 +24,6 @@ export const env = {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
-  seedOwner: {
-    name: process.env.SEED_OWNER_NAME ?? "Owner Account",
-    email: process.env.SEED_OWNER_EMAIL ?? "owner@itplace.shop",
-    password: process.env.SEED_OWNER_PASSWORD ?? "ChangeMe123!",
-  },
   email: {
     user: process.env.EMAIL_USER,
     appPassword: process.env.APP_PASSWORD,

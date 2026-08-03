@@ -375,7 +375,7 @@ export default function Brokers() {
           <FieldGroup>
             <Label htmlFor="btx-type">Type</Label>
             <Select id="btx-type" value={txType} onChange={(e) => setTxType(e.target.value)}>
-              <option value="Credit">Add money (commission owed)</option>
+              <option value="Credit">Add money (New Comission add )</option>
               <option value="Payment">Pay broker (reduces balance)</option>
             </Select>
           </FieldGroup>
