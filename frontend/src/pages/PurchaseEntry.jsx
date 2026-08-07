@@ -3,17 +3,11 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import { Card, CardHeader, CardBody } from "../components/ui/Card";
-import { Input, Textarea, Label, FieldGroup, FieldError } from "../components/ui/Field";
+import { Input, Label, FieldGroup, FieldError } from "../components/ui/Field";
 import Button from "../components/ui/Button";
 import ProductPicker from "../components/ui/ProductPicker";
-import {
-  useGetProductsQuery,
-  useGetSuppliersQuery,
-  useGetPurchasesQuery,
-  useCreatePurchaseMutation,
-} from "../app/apiSlice";
+import { useGetProductsQuery, useCreatePurchaseMutation } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
-import { weightedAverage, formatCurrency } from "../lib/format";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -21,48 +15,22 @@ export default function PurchaseEntry() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { data: productsRes } = useGetProductsQuery({ limit: 200 });
-  const { data: suppliersRes } = useGetSuppliersQuery();
   const [createPurchase, { isLoading: saving }] = useCreatePurchaseMutation();
 
   const products = productsRes?.data ?? [];
-  const suppliers = suppliersRes?.data ?? [];
 
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [unitPrice, setUnitPrice] = useState("");
-  const [supplier, setSupplier] = useState("");
   const [date, setDate] = useState(today());
-  const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState({});
 
   const selectedProduct = products.find((p) => p._id === productId);
-  const { data: historyRes } = useGetPurchasesQuery({ product: productId, limit: 200 }, { skip: !productId });
-  const history = historyRes?.data ?? [];
-
-  // Mirrors purchaseController.createPurchase: once a product has gone out of
-  // stock, only purchases since that point count toward its average — older,
-  // pre-stockout prices shouldn't get blended into this preview either.
-  const cycleHistory = useMemo(() => {
-    if (!selectedProduct?.stockResetAt) return history;
-    const resetAt = new Date(selectedProduct.stockResetAt).getTime();
-    return history.filter((h) => new Date(h.createdAt).getTime() >= resetAt);
-  }, [history, selectedProduct]);
 
   const preview = useMemo(() => {
-    if (!productId || !quantity || !unitPrice) return null;
-    const candidate = [...cycleHistory, { quantity: Number(quantity), unitPrice: Number(unitPrice) }];
-    return {
-      newAvg: weightedAverage(candidate),
-      newStock: (selectedProduct?.currentStock ?? 0) + Number(quantity),
-    };
-  }, [productId, quantity, unitPrice, cycleHistory, selectedProduct]);
-
-  // cycleHistory is sorted newest-first by the API; reverse the last 5 so the
-  // row reads oldest → newest, ending with the most recent buying price.
-  const lastPrices = useMemo(
-    () => cycleHistory.slice(0, 5).reverse().map((h) => ({ unitPrice: h.unitPrice, quantity: h.quantity })),
-    [cycleHistory]
-  );
+    if (!productId || !quantity) return null;
+    return { newStock: (selectedProduct?.currentStock ?? 0) + Number(quantity) };
+  }, [productId, quantity, selectedProduct]);
 
   function validate() {
     const next = {};
@@ -96,7 +64,7 @@ export default function PurchaseEntry() {
     <div>
       <PageHeader
         title="Purchase entry"
-        description="Every stock-in is a purchase record. Prior costs are never overwritten — the average updates instead."
+        description="Every stock-in is a purchase record, kept for the shop's cost history and spend reports."
       />
 
       <div className="grid gap-5 lg:grid-cols-3">
@@ -145,45 +113,18 @@ export default function PurchaseEntry() {
         </Card>
 
         <Card className="h-fit">
-          <CardHeader title="Cost impact" description="Recalculated live as you type" />
+          <CardHeader title="Stock impact" description="Recalculated live as you type" />
           <CardBody className="space-y-4">
             {!selectedProduct ? (
-              <p className="text-[13px] text-text-muted">Choose a product to preview its updated cost and stock.</p>
+              <p className="text-[13px] text-text-muted">Choose a product to preview its updated stock.</p>
             ) : (
-              <>
-                <div>
-                  <p className="font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Current avg. cost</p>
-                  <p className="mt-1 font-mono text-lg text-text">{formatCurrency(selectedProduct.avgBuyingPrice)}</p>
-                </div>
-                <div>
-                  <p className="font-mono text-[10.5px] uppercase tracking-wide text-text-faint">New avg. cost</p>
-                  <p className="mt-1 font-mono text-lg font-semibold text-rose">
-                    {preview ? formatCurrency(preview.newAvg) : "—"}
-                  </p>
-                </div>
-                {lastPrices.length > 0 && (
-                  <div className="border-t border-border pt-4">
-                    <p className="font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Last buying prices</p>
-                    <p className="mt-1 flex flex-wrap items-center gap-1.5 font-mono text-[13px] text-text">
-                      {lastPrices.map((entry, i) => (
-                        <span key={i} className="flex items-center gap-1.5">
-                          {i > 0 && <span className="text-text-faint">→</span>}
-                          <span>
-                            {formatCurrency(entry.unitPrice)} <span className="text-text-faint">({entry.quantity})</span>
-                          </span>
-                        </span>
-                      ))}
-                    </p>
-                  </div>
-                )}
-                <div className="border-t border-border pt-4">
-                  <p className="font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Stock on hand</p>
-                  <p className="mt-1 font-mono text-lg text-text">
-                    {selectedProduct.currentStock} <span className="text-text-faint">→</span>{" "}
-                    <span className="font-semibold text-solder">{preview ? preview.newStock : selectedProduct.currentStock}</span>
-                  </p>
-                </div>
-              </>
+              <div>
+                <p className="font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Stock on hand</p>
+                <p className="mt-1 font-mono text-lg text-text">
+                  {selectedProduct.currentStock} <span className="text-text-faint">→</span>{" "}
+                  <span className="font-semibold text-solder">{preview ? preview.newStock : selectedProduct.currentStock}</span>
+                </p>
+              </div>
             )}
           </CardBody>
         </Card>

@@ -3,7 +3,6 @@ import { Purchase } from "../models/Purchase.js";
 import { Product } from "../models/Product.js";
 import { InventoryLog } from "../models/InventoryLog.js";
 import { ApiError } from "../utils/ApiError.js";
-import { weightedAverage } from "../utils/weightedAverage.js";
 import { logActivity } from "../utils/logActivity.js";
 
 const POPULATE = [
@@ -38,10 +37,9 @@ export const listPurchases = asyncHandler(async (req, res) => {
   res.json({ success: true, data: items, meta: { total, page: pageNum, pages: Math.ceil(total / limitNum) || 1 } });
 });
 
-// Stock-in entry point. Never edits a prior purchase's price — the product's
-// weighted-average cost is recomputed from purchase history instead. If the
-// product has run out of stock since, only purchases from that point on
-// count — older, pre-stockout prices don't get blended into the new cycle.
+// Stock-in entry point. Never edits a prior purchase's price — each purchase
+// is kept as its own historical record. Doesn't touch the product's
+// wholesale price; that's a plain field the owner sets/updates separately.
 export const createPurchase = asyncHandler(async (req, res) => {
   const { product: productId, quantity, unitPrice, supplier, date, notes } = req.body;
 
@@ -58,10 +56,6 @@ export const createPurchase = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
-  const historyFilter = { product: productId };
-  if (product.stockResetAt) historyFilter.createdAt = { $gte: product.stockResetAt };
-  const history = await Purchase.find(historyFilter).select("quantity unitPrice");
-  product.avgBuyingPrice = weightedAverage(history);
   product.currentStock += quantity;
   await product.save();
 

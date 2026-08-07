@@ -9,19 +9,21 @@ const router = Router();
 const identityRules = [
   body("name").trim().notEmpty().withMessage("Product name is required."),
   body("brand").isMongoId().withMessage("Choose a valid brand."),
-  body("category").isMongoId().withMessage("Choose a valid category."),
 ];
 
 const createProductRules = [
   ...identityRules,
-  body("sellingPrice").trim().notEmpty().withMessage("Selling price is required."),
+  body("category").optional({ values: "falsy" }).isMongoId().withMessage("Choose a valid category."),
+  body("sellingPrice").optional({ values: "falsy" }).trim(),
   body("quantity").isInt({ min: 1 }).withMessage("Enter a starting quantity of at least 1."),
-  body("buyingPrice").isFloat({ min: 0 }).withMessage("Enter a valid buying price."),
+  body("wholesalePrice").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("Enter a valid wholesale price."),
 ];
 
 const updateProductRules = [
   ...identityRules,
+  body("category").optional({ values: "falsy" }).isMongoId().withMessage("Choose a valid category."),
   body("sellingPrice").optional({ values: "falsy" }).trim(),
+  body("wholesalePrice").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("Enter a valid wholesale price."),
   body("supplier").optional({ values: "falsy" }).isMongoId().withMessage("Choose a valid supplier."),
 ];
 

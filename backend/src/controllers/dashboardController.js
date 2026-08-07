@@ -24,7 +24,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
   const todayEnd = endOfToday();
 
   const [products, purchases, expenses, dues, totalEmployees, todaysPurchases, todaysExpenses] = await Promise.all([
-    Product.find().select("currentStock avgBuyingPrice").lean(),
+    Product.find().select("currentStock wholesalePrice").lean(),
     Purchase.find().select("date quantity unitPrice").lean(),
     Expense.find().select("date amount").lean(),
     CustomerDue.find().select("remainingDue").lean(),
@@ -34,7 +34,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
   ]);
 
   const stockOnHand = products.reduce((s, p) => s + Math.max(p.currentStock, 0), 0);
-  const inventoryValue = products.reduce((s, p) => s + p.currentStock * p.avgBuyingPrice, 0);
+  const inventoryValue = products.reduce((s, p) => s + p.currentStock * (p.wholesalePrice || 0), 0);
   const lowStockCount = products.filter((p) => p.currentStock > 0 && p.currentStock <= settings.lowStockThreshold).length;
   const outOfStockCount = products.filter((p) => p.currentStock <= 0).length;
   const totalOutstandingDues = dues.reduce((s, d) => s + d.remainingDue, 0);

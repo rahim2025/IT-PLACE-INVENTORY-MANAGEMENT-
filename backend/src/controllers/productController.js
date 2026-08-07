@@ -5,7 +5,6 @@ import { InventoryLog } from "../models/InventoryLog.js";
 import { CustomerDue } from "../models/CustomerDue.js";
 import { ApiError } from "../utils/ApiError.js";
 import { logActivity } from "../utils/logActivity.js";
-import { weightedAverage } from "../utils/weightedAverage.js";
 
 const POPULATE = [
   { path: "brand", select: "name" },
@@ -47,30 +46,33 @@ export const getProduct = asyncHandler(async (req, res) => {
   res.json({ success: true, data: product });
 });
 
-// Starting stock/cost are captured here as a real Purchase (not special-cased
-// defaults), so they follow the same weighted-average + InventoryLog trail as
-// every later restock — see purchaseController.createPurchase.
+// Starting stock is captured here as a real Purchase (not a special-cased
+// default), so it follows the same InventoryLog trail as every later restock
+// — see purchaseController.createPurchase. Wholesale price, unlike stock, is
+// a plain user-set field: it's not recomputed from purchase history and can
+// be changed later via updateProduct.
 export const createProduct = asyncHandler(async (req, res) => {
-  const { name, brand, category, sellingPrice, quantity, buyingPrice } = req.body;
+  const { name, brand, category, sellingPrice, quantity } = req.body;
+  const wholesalePrice = req.body.wholesalePrice ? Number(req.body.wholesalePrice) : 0;
 
   const product = await Product.create({
     name,
     brand,
-    category,
-    sellingPrice,
+    category: category || undefined,
+    sellingPrice: sellingPrice || undefined,
+    wholesalePrice: req.body.wholesalePrice ? wholesalePrice : undefined,
     createdBy: req.user._id,
   });
 
   const purchase = await Purchase.create({
     product: product._id,
     quantity,
-    unitPrice: buyingPrice,
+    unitPrice: wholesalePrice,
     date: Date.now(),
     notes: "Initial stock-in.",
     createdBy: req.user._id,
   });
 
-  product.avgBuyingPrice = weightedAverage([{ quantity, unitPrice: buyingPrice }]);
   product.currentStock = quantity;
   await product.save();
 
@@ -91,17 +93,18 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { name, brand, category, barcode, description, sellingPrice, supplier, image } = req.body;
+  const { name, brand, category, barcode, description, sellingPrice, wholesalePrice, supplier, image } = req.body;
 
   const product = await Product.findById(req.params.id);
   if (!product) throw new ApiError(404, "Product not found.");
 
   if (name !== undefined) product.name = name;
   if (brand !== undefined) product.brand = brand;
-  if (category !== undefined) product.category = category;
+  if (category !== undefined) product.category = category || undefined;
   if (barcode !== undefined) product.barcode = barcode || undefined;
   if (description !== undefined) product.description = description;
   if (sellingPrice !== undefined) product.sellingPrice = sellingPrice;
+  if (wholesalePrice !== undefined) product.wholesalePrice = wholesalePrice === "" ? undefined : Number(wholesalePrice);
   if (supplier !== undefined) product.supplier = supplier || undefined;
   if (image !== undefined) product.image = image;
 
@@ -110,19 +113,21 @@ export const updateProduct = asyncHandler(async (req, res) => {
   res.json({ success: true, data: product });
 });
 
+// Purchase history isn't checked here — every product gets an "Initial
+// stock-in" Purchase the moment it's created (see createProduct), so that
+// would block every deletion, always. Past Purchase/InventoryLog rows for
+// this product are left in place after deletion (they're already rendered
+// null-safely wherever a deleted product's name would otherwise show), so
+// purchase-spend history and reports stay intact.
 export const deleteProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
   if (!product) throw new ApiError(404, "Product not found.");
 
-  const [purchaseCount, dueCount] = await Promise.all([
-    Purchase.countDocuments({ product: product._id }),
-    CustomerDue.countDocuments({ product: product._id }),
-  ]);
-
-  if (purchaseCount > 0 || dueCount > 0) {
+  const dueCount = await CustomerDue.countDocuments({ product: product._id });
+  if (dueCount > 0) {
     throw new ApiError(
       409,
-      "This product has purchase or due history attached, so it can't be deleted. Consider keeping it in the catalog instead."
+      "This product has customer due records attached, so it can't be deleted. Consider keeping it in the catalog instead."
     );
   }
 

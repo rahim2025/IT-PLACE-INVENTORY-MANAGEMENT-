@@ -46,6 +46,7 @@ function EditProductModal({ product, categories, brands, onClose }) {
     brand: product?.brand?.name ?? "",
     category: product?.category?.name ?? "",
     sellingPrice: product?.sellingPrice ?? "",
+    wholesalePrice: product?.wholesalePrice ?? "",
   }));
   const [errors, setErrors] = useState({});
 
@@ -59,7 +60,7 @@ function EditProductModal({ product, categories, brands, onClose }) {
     const next = {};
     if (!form.name.trim()) next.name = "Product name is required.";
     if (!form.brand.trim()) next.brand = "Choose or enter a brand.";
-    if (!form.category.trim()) next.category = "Choose or enter a category.";
+    if (form.wholesalePrice !== "" && Number(form.wholesalePrice) < 0) next.wholesalePrice = "Enter a valid wholesale price.";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -72,6 +73,7 @@ function EditProductModal({ product, categories, brands, onClose }) {
   }
 
   async function resolveCategoryId() {
+    if (!form.category.trim()) return "";
     const existing = categories.find((c) => c.name.toLowerCase() === form.category.trim().toLowerCase());
     if (existing) return existing._id;
     const res = await createCategory(form.category.trim()).unwrap();
@@ -90,6 +92,7 @@ function EditProductModal({ product, categories, brands, onClose }) {
         brand: brandId,
         category: categoryId,
         sellingPrice: form.sellingPrice.trim() || undefined,
+        wholesalePrice: form.wholesalePrice === "" ? "" : Number(form.wholesalePrice),
       }).unwrap();
       dispatch(pushed({ message: `${form.name.trim()} updated.` }));
       onClose();
@@ -104,7 +107,7 @@ function EditProductModal({ product, categories, brands, onClose }) {
   }
 
   return (
-    <Modal open={!!product} onClose={onClose} title="Edit product" description="Stock and average cost aren't editable here — they follow purchase history." size="lg">
+    <Modal open={!!product} onClose={onClose} title="Edit product" description="Stock isn't editable here — it follows purchase and adjustment history. Wholesale price can be set or changed anytime." size="lg">
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
         <FieldGroup className="sm:col-span-2">
           <Label htmlFor="edit-name">Product name</Label>
@@ -124,7 +127,7 @@ function EditProductModal({ product, categories, brands, onClose }) {
         </FieldGroup>
 
         <FieldGroup>
-          <Label htmlFor="edit-category" hint="type to add new">Category</Label>
+          <Label htmlFor="edit-category" hint="optional — type to add new">Category</Label>
           <Input id="edit-category" list="edit-category-options" value={form.category} onChange={(e) => update("category", e.target.value)} />
           <datalist id="edit-category-options">
             {categories.map((c) => (
@@ -134,9 +137,22 @@ function EditProductModal({ product, categories, brands, onClose }) {
           <FieldError>{errors.category}</FieldError>
         </FieldGroup>
 
-        <FieldGroup className="sm:col-span-2">
+        <FieldGroup>
           <Label htmlFor="edit-sellingPrice" hint="optional — e.g. a range like 15000-16000">Selling price</Label>
           <Input id="edit-sellingPrice" value={form.sellingPrice} onChange={(e) => update("sellingPrice", e.target.value)} />
+        </FieldGroup>
+
+        <FieldGroup>
+          <Label htmlFor="edit-wholesalePrice" hint="optional">Wholesale price</Label>
+          <Input
+            id="edit-wholesalePrice"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.wholesalePrice}
+            onChange={(e) => update("wholesalePrice", e.target.value)}
+          />
+          <FieldError>{errors.wholesalePrice}</FieldError>
         </FieldGroup>
 
         <div className="flex justify-end gap-2 pt-1 sm:col-span-2">
@@ -178,7 +194,7 @@ export default function Products() {
         brandName: p.brand?.name ?? "",
         categoryName: p.category?.name ?? "",
         stockStatus: getStockStatus(p.currentStock, threshold),
-        value: p.currentStock * p.avgBuyingPrice,
+        value: p.currentStock * (p.wholesalePrice || 0),
       })),
     [products, threshold]
   );
@@ -207,7 +223,7 @@ export default function Products() {
     <div>
       <PageHeader
         title="Products"
-        description={`${products.length} products in the catalog · stock and cost update automatically from purchases.`}
+        description={`${products.length} products in the catalog · stock updates automatically from purchases, wholesale price is set manually.`}
         action={
           canAddProduct && (
             <Link to="/products/new">
@@ -267,7 +283,7 @@ export default function Products() {
                   </AssetTag>
                 ),
               },
-              { key: "avgBuyingPrice", header: "Avg. buying price", align: "right", mono: true, render: (r) => formatCurrency(r.avgBuyingPrice) },
+              { key: "wholesalePrice", header: "Wholesale price", align: "right", mono: true, render: (r) => (r.wholesalePrice ? formatCurrency(r.wholesalePrice) : "—") },
               { key: "sellingPrice", header: "Selling price", align: "right", mono: true, render: (r) => r.sellingPrice || "—" },
               { key: "value", header: "Stock value", align: "right", mono: true, render: (r) => formatCurrency(r.value) },
               ...(isOwner
@@ -329,7 +345,7 @@ export default function Products() {
         title={`Delete ${deletingProduct?.name ?? "product"}?`}
         description={
           deleteError ||
-          "This can't be undone. Products with purchase or due history attached can't be deleted — keep them in the catalog instead."
+          "This can't be undone. Products with customer due records attached can't be deleted — keep them in the catalog instead."
         }
         confirmLabel="Delete product"
       />

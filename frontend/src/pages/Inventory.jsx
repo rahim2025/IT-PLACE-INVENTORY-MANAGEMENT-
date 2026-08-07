@@ -113,7 +113,7 @@ export default function Inventory() {
               { key: "name", header: "Product", render: (r) => <span className="font-medium text-text">{r.name}</span> },
               { key: "category", header: "Category", render: (r) => r.category?.name ?? "—" },
               { key: "currentStock", header: "Stock", align: "right", mono: true },
-              { key: "avgBuyingPrice", header: "Avg. cost", align: "right", mono: true, render: (r) => formatCurrency(r.avgBuyingPrice) },
+              { key: "wholesalePrice", header: "Wholesale price", align: "right", mono: true, render: (r) => (r.wholesalePrice ? formatCurrency(r.wholesalePrice) : "—") },
               { key: "value", header: "Value", align: "right", mono: true, render: (r) => formatCurrency(r.value) },
               { key: "status", header: "Status", render: (r) => <AssetTag tone={STOCK_TONE[r.stockStatus]}>{STOCK_LABEL[r.stockStatus]}</AssetTag> },
             ]}

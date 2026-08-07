@@ -66,8 +66,8 @@ export const getReport = asyncHandler(async (req, res) => {
   ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const stockAdded = purchases.reduce((s, p) => s + p.quantity, 0);
-  const products = await Product.find().select("currentStock avgBuyingPrice").lean();
-  const inventoryValue = products.reduce((s, p) => s + p.currentStock * p.avgBuyingPrice, 0);
+  const products = await Product.find().select("currentStock wholesalePrice").lean();
+  const inventoryValue = products.reduce((s, p) => s + p.currentStock * (p.wholesalePrice || 0), 0);
 
   res.json({
     success: true,

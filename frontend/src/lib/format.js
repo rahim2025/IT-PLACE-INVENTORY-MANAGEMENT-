@@ -34,10 +34,3 @@ export function formatDateTime(value) {
 export function formatSKU(id) {
   return `SKU-${String(id).padStart(5, "0")}`;
 }
-
-export function weightedAverage(entries) {
-  const totalQty = entries.reduce((sum, e) => sum + e.quantity, 0);
-  if (totalQty === 0) return 0;
-  const totalCost = entries.reduce((sum, e) => sum + e.quantity * e.unitPrice, 0);
-  return totalCost / totalQty;
-}

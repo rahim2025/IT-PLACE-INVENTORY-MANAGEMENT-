@@ -14,7 +14,7 @@ export const getStockOverview = asyncHandler(async (req, res) => {
     .sort({ name: 1 });
 
   const rows = products.map((p) => {
-    const value = p.currentStock * p.avgBuyingPrice;
+    const value = p.currentStock * (p.wholesalePrice || 0);
     const stockStatus = p.currentStock <= 0 ? "out" : p.currentStock <= settings.lowStockThreshold ? "low" : "ok";
     return { ...p.toObject(), value, stockStatus };
   });

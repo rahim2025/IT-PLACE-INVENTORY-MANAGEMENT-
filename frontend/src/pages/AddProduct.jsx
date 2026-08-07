@@ -21,7 +21,7 @@ const emptyRow = () => ({
   brand: "",
   category: "",
   quantity: "",
-  buyingPrice: "",
+  wholesalePrice: "",
   sellingPrice: "",
 });
 
@@ -31,10 +31,8 @@ function validateRow(row) {
   const errors = [];
   if (!row.name.trim()) errors.push("product name");
   if (!row.brand.trim()) errors.push("brand");
-  if (!row.category.trim()) errors.push("category");
   if (!row.quantity || Number(row.quantity) < 1) errors.push("starting quantity");
-  if (row.buyingPrice === "" || Number(row.buyingPrice) < 0) errors.push("buying price");
-  if (!row.sellingPrice.trim()) errors.push("selling price");
+  if (row.wholesalePrice !== "" && Number(row.wholesalePrice) < 0) errors.push("wholesale price");
   if (errors.length === 0) return null;
   return `Missing or invalid: ${errors.join(", ")}.`;
 }
@@ -110,15 +108,15 @@ export default function AddProduct() {
       try {
         const [brandId, categoryId] = await Promise.all([
           resolveEntity(row.brand, knownBrands, createBrand),
-          resolveEntity(row.category, knownCategories, createCategory),
+          row.category.trim() ? resolveEntity(row.category, knownCategories, createCategory) : Promise.resolve(undefined),
         ]);
         await createProduct({
           name: row.name.trim(),
           brand: brandId,
           category: categoryId,
           quantity: Number(row.quantity),
-          buyingPrice: Number(row.buyingPrice),
-          sellingPrice: row.sellingPrice.trim(),
+          wholesalePrice: row.wholesalePrice === "" ? undefined : Number(row.wholesalePrice),
+          sellingPrice: row.sellingPrice.trim() || undefined,
         }).unwrap();
         addedCount += 1;
       } catch (err) {
@@ -146,7 +144,7 @@ export default function AddProduct() {
     <div>
       <PageHeader
         title="Add products"
-        description="Add one product or several at once. Starting stock and cost are recorded as each product's first purchase — later restocks go through Purchase Entry."
+        description="Add one product or several at once. Starting stock is recorded as each product's first purchase — later restocks go through Purchase Entry. Wholesale price is optional and can be set or changed anytime from the Products page."
       />
 
       <Card>
@@ -158,10 +156,10 @@ export default function AddProduct() {
                 <div className={ROW_GRID}>
                   <Label>Product name</Label>
                   <Label>Brand</Label>
-                  <Label>Category</Label>
+                  <Label>Category (optional)</Label>
                   <Label>Qty</Label>
-                  <Label>Buying price</Label>
-                  <Label>Selling price</Label>
+                  <Label>Wholesale price (optional)</Label>
+                  <Label>Selling price (optional)</Label>
                   <span />
                 </div>
 
@@ -199,12 +197,12 @@ export default function AddProduct() {
                           placeholder="0"
                         />
                         <Input
-                          aria-label="Buying price"
+                          aria-label="Wholesale price"
                           type="number"
                           min="0"
                           step="0.01"
-                          value={row.buyingPrice}
-                          onChange={(e) => updateRow(row.key, "buyingPrice", e.target.value)}
+                          value={row.wholesalePrice}
+                          onChange={(e) => updateRow(row.key, "wholesalePrice", e.target.value)}
                           placeholder="0.00"
                         />
                         <Input
