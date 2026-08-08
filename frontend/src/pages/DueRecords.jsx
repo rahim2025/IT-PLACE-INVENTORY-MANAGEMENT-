@@ -32,7 +32,7 @@ const STATUS_TONE = { Due: "rose", Paid: "solder" };
 function AddDueModal({ open, onClose }) {
   const dispatch = useDispatch();
   const { data: customersRes } = useGetCustomersQuery();
-  const { data: productsRes } = useGetProductsQuery({ limit: 200 });
+  const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
   const [createCustomer] = useCreateCustomerMutation();
   const [createDue, { isLoading: saving }] = useCreateDueMutation();
 
@@ -179,7 +179,7 @@ function AddDueModal({ open, onClose }) {
 
 function EditDueModal({ due, onClose }) {
   const dispatch = useDispatch();
-  const { data: productsRes } = useGetProductsQuery({ limit: 200 });
+  const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
   const [updateDue, { isLoading: saving }] = useUpdateDueMutation();
 
   const products = productsRes?.data ?? [];

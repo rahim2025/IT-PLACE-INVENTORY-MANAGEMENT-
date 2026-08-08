@@ -20,7 +20,7 @@ const emptyItem = () => ({ productId: "", quantity: 1, unitPrice: "" });
 
 function RecordSaleModal({ open, onClose }) {
   const dispatch = useDispatch();
-  const { data: productsRes } = useGetProductsQuery({ limit: 200 });
+  const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
   const [createSale, { isLoading: saving }] = useCreateSaleMutation();
 
   const products = productsRes?.data ?? [];

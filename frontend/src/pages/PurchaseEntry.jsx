@@ -14,14 +14,14 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function PurchaseEntry() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { data: productsRes } = useGetProductsQuery({ limit: 200 });
+  const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
   const [createPurchase, { isLoading: saving }] = useCreatePurchaseMutation();
 
   const products = productsRes?.data ?? [];
 
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [unitPrice, setUnitPrice] = useState("");
+  const [wholesalePrice, setWholesalePrice] = useState("");
   const [date, setDate] = useState(today());
   const [errors, setErrors] = useState({});
 
@@ -36,7 +36,7 @@ export default function PurchaseEntry() {
     const next = {};
     if (!productId) next.productId = "Choose a product.";
     if (!quantity || Number(quantity) <= 0) next.quantity = "Enter a quantity greater than zero.";
-    if (!unitPrice || Number(unitPrice) < 0) next.unitPrice = "Enter a unit buying price.";
+    if (wholesalePrice !== "" && Number(wholesalePrice) < 0) next.wholesalePrice = "Enter a valid wholesale price.";
     if (!date) next.date = "Choose a purchase date.";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -49,9 +49,8 @@ export default function PurchaseEntry() {
       await createPurchase({
         product: productId,
         quantity: Number(quantity),
-        unitPrice: Number(unitPrice),
-        date
-        
+        unitPrice: wholesalePrice === "" ? undefined : Number(wholesalePrice),
+        date,
       }).unwrap();
       dispatch(pushed({ message: `Stocked in ${quantity} × ${selectedProduct?.name}.` }));
       navigate("/purchases");
@@ -90,9 +89,9 @@ export default function PurchaseEntry() {
               </FieldGroup>
 
               <FieldGroup>
-                <Label htmlFor="unitPrice">Unit buying price</Label>
-                <Input id="unitPrice" type="number" min="0" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} placeholder="0.00" />
-                <FieldError>{errors.unitPrice}</FieldError>
+                <Label htmlFor="wholesalePrice" hint="optional">Wholesale price</Label>
+                <Input id="wholesalePrice" type="number" min="0" step="0.01" value={wholesalePrice} onChange={(e) => setWholesalePrice(e.target.value)} placeholder="0.00" />
+                <FieldError>{errors.wholesalePrice}</FieldError>
               </FieldGroup>
 
 

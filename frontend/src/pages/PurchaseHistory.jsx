@@ -19,8 +19,8 @@ import { formatCurrency, formatDate, formatNumber } from "../lib/format";
 
 export default function PurchaseHistory() {
   const [searchParams] = useSearchParams();
-  const { data: purchasesRes, isLoading } = useGetPurchasesQuery({ limit: 200 });
-  const { data: productsRes } = useGetProductsQuery({ limit: 200 });
+  const { data: purchasesRes, isLoading } = useGetPurchasesQuery({ limit: 1000 });
+  const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
   const { data: suppliersRes } = useGetSuppliersQuery();
   const { data: categoriesRes } = useGetCategoriesQuery();
   const { data: brandsRes } = useGetBrandsQuery();

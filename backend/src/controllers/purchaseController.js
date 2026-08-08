@@ -23,7 +23,7 @@ export const listPurchases = asyncHandler(async (req, res) => {
   }
 
   const pageNum = Math.max(Number(page) || 1, 1);
-  const limitNum = Math.min(Math.max(Number(limit) || 10, 1), 100);
+  const limitNum = Math.min(Math.max(Number(limit) || 10, 1), 1000);
 
   const [items, total] = await Promise.all([
     Purchase.find(filter)
@@ -49,7 +49,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
   const purchase = await Purchase.create({
     product: productId,
     quantity,
-    unitPrice,
+    unitPrice: unitPrice ? Number(unitPrice) : 0,
     supplier: supplier || undefined,
     date: date || Date.now(),
     notes,

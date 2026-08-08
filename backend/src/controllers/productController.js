@@ -22,7 +22,13 @@ export const listProducts = asyncHandler(async (req, res) => {
   if (supplier) filter.supplier = supplier;
 
   const pageNum = Math.max(Number(page) || 1, 1);
-  const limitNum = Math.min(Math.max(Number(limit) || 10, 1), 100);
+  // No upper cap here, unlike other list endpoints — the catalog is
+  // reference data (bounded by what the shop actually stocks, not an
+  // ever-growing log like purchases/sales), and pages across the app fetch
+  // it in one shot for pickers, filters, and the products table itself.
+  // Capping at a fixed number just means the bug resurfaces once the
+  // catalog outgrows it — same failure mode as the old 100-item cap.
+  const limitNum = Math.max(Number(limit) || 10, 1);
 
   const [items, total] = await Promise.all([
     Product.find(filter)

@@ -28,7 +28,7 @@ function StatTile({ label, value, tone }) {
 export default function Inventory() {
   const dispatch = useDispatch();
   const { data: overviewRes, isLoading } = useGetStockOverviewQuery();
-  const { data: productsRes } = useGetProductsQuery({ limit: 200 });
+  const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
   const [createAdjustment, { isLoading: saving }] = useCreateAdjustmentMutation();
 
   const rows = overviewRes?.data ?? [];
@@ -111,6 +111,7 @@ export default function Inventory() {
             }
             columns={[
               { key: "name", header: "Product", render: (r) => <span className="font-medium text-text">{r.name}</span> },
+              { key: "brand", header: "Brand", render: (r) => r.brand?.name ?? "—" },
               { key: "category", header: "Category", render: (r) => r.category?.name ?? "—" },
               { key: "currentStock", header: "Stock", align: "right", mono: true },
               { key: "wholesalePrice", header: "Wholesale price", align: "right", mono: true, render: (r) => (r.wholesalePrice ? formatCurrency(r.wholesalePrice) : "—") },

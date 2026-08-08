@@ -21,7 +21,13 @@ const PERIODS = [
   { key: "yearly", label: "Yearly" },
 ];
 
-const TYPE_TONE = { Purchase: "solder", Expense: "trace", "Employee payment": "rose", "Due collection": "neutral" };
+const TYPE_TONE = {
+  Purchase: "solder",
+  Expense: "trace",
+  "Employee payment": "rose",
+  "Broker payout": "rose",
+  "Due collection": "neutral",
+};
 
 const INVOICE_SECTIONS = [
   { key: "sales", label: "Sales" },
@@ -118,7 +124,15 @@ export default function Reports() {
 
   const report = reportRes?.data;
   const rows = report?.ledger ?? [];
-  const totals = report?.totals ?? { purchases: 0, stockAdded: 0, expenses: 0, employeePayments: 0, dueCollected: 0, inventoryValue: 0 };
+  const totals = report?.totals ?? {
+    purchases: 0,
+    stockAdded: 0,
+    expenses: 0,
+    employeePayments: 0,
+    brokerPayments: 0,
+    dueCollected: 0,
+    inventoryValue: 0,
+  };
   const start = report?.range?.start;
   const end = report?.range?.end;
 
@@ -178,8 +192,8 @@ export default function Reports() {
         title="Reports"
         description={
           start && end
-            ? `${formatDate(start)} – ${formatDate(end)} · purchases, expenses, payroll, and due collections in one ledger.`
-            : "Purchases, expenses, payroll, and due collections in one ledger."
+            ? `${formatDate(start)} – ${formatDate(end)} · purchases, expenses, payroll, broker payouts, and due collections in one ledger.`
+            : "Purchases, expenses, payroll, broker payouts, and due collections in one ledger."
         }
         action={
           <div className="flex gap-2">
@@ -351,12 +365,13 @@ export default function Reports() {
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {[
           { label: "Purchases", value: formatCurrency(totals.purchases) },
           { label: "Stock added", value: `${totals.stockAdded} units` },
           { label: "Expenses", value: formatCurrency(totals.expenses) },
           { label: "Employee payments", value: formatCurrency(totals.employeePayments) },
+          { label: "Broker commission paid", value: formatCurrency(totals.brokerPayments) },
           { label: "Due collected", value: formatCurrency(totals.dueCollected) },
         ].map((t) => (
           <Card key={t.label} className="px-4.5 py-3.5">
@@ -371,7 +386,7 @@ export default function Reports() {
       </div>
 
       <Card className="mt-5">
-        <CardHeader title="Ledger" description="Every purchase, expense, payroll payment, and due collection in the selected period" />
+        <CardHeader title="Ledger" description="Every purchase, expense, payroll payment, broker payout, and due collection in the selected period" />
         {isLoading ? (
           <SkeletonRows rows={8} cols={4} />
         ) : (

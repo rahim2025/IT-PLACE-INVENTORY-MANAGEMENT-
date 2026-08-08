@@ -170,7 +170,7 @@ export default function Products() {
   const isOwner = user?.role === "owner";
   const canAddProduct = user?.role === "owner" || user?.role === "employee";
 
-  const { data: productsRes, isLoading } = useGetProductsQuery({ limit: 200 });
+  const { data: productsRes, isLoading } = useGetProductsQuery({ limit: 100000 });
   const { data: categoriesRes } = useGetCategoriesQuery();
   const { data: brandsRes } = useGetBrandsQuery();
   const { data: settingsRes } = useGetSettingsQuery();

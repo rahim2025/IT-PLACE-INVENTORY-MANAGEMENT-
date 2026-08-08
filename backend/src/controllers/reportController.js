@@ -27,10 +27,13 @@ export const getReport = asyncHandler(async (req, res) => {
   const { start, end } = getRange(period);
   const range = { $gte: start, $lte: end };
 
-  const [purchases, expenses, employeeTx, duePayments] = await Promise.all([
+  const [purchases, expenses, employeeTx, brokerPayments, duePayments] = await Promise.all([
     Purchase.find({ date: range }).populate({ path: "product", select: "name" }).lean(),
     Expense.find({ date: range }).lean(),
     EmployeeTransaction.find({ date: range }).populate({ path: "employee", select: "name" }).lean(),
+    // "Payment" only — mirrors getInvoice: a "Credit" just records an accrued
+    // liability, no money has moved yet, so it shouldn't count as a cost here.
+    BrokerTransaction.find({ date: range, type: "Payment" }).populate({ path: "broker", select: "name" }).lean(),
     DuePayment.find({ date: range }).lean(),
   ]);
 
@@ -53,6 +56,13 @@ export const getReport = asyncHandler(async (req, res) => {
       id: `emptx-${t._id}`,
       type: "Employee payment",
       detail: `${t.type}${t.employee?.name ? ` — ${t.employee.name}` : ""}`,
+      amount: t.amount,
+      date: t.date,
+    })),
+    ...brokerPayments.map((t) => ({
+      id: `brokertx-${t._id}`,
+      type: "Broker payout",
+      detail: `${t.broker?.name ?? "Broker"}${t.notes ? ` — ${t.notes}` : ""}`,
       amount: t.amount,
       date: t.date,
     })),
@@ -80,6 +90,7 @@ export const getReport = asyncHandler(async (req, res) => {
         stockAdded,
         expenses: expenses.reduce((s, e) => s + e.amount, 0),
         employeePayments: employeeTx.reduce((s, t) => s + t.amount, 0),
+        brokerPayments: brokerPayments.reduce((s, t) => s + t.amount, 0),
         dueCollected: duePayments.reduce((s, p) => s + p.amount, 0),
         inventoryValue,
       },
