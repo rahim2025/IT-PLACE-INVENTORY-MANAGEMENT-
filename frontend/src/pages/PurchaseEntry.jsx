@@ -50,7 +50,12 @@ export default function PurchaseEntry() {
         product: productId,
         quantity: Number(quantity),
         unitPrice: wholesalePrice === "" ? undefined : Number(wholesalePrice),
-        date,
+        // Omit when it's still today's default so the backend stamps the
+        // exact current time (Date.now()) instead of midnight — otherwise a
+        // same-day purchase sorts *below* anything created earlier that day
+        // with a real timestamp (e.g. a product's initial stock-in), making
+        // a brand-new entry look like it's missing from the top of the list.
+        date: date === today() ? undefined : date,
       }).unwrap();
       dispatch(pushed({ message: `Stocked in ${quantity} × ${selectedProduct?.name}.` }));
       navigate("/purchases");

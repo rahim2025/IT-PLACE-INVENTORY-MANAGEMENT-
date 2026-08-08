@@ -11,7 +11,6 @@ import StatusStrip from "../components/dashboard/StatusStrip";
 import {
   useGetPurchasesQuery,
   useGetProductsQuery,
-  useGetSuppliersQuery,
   useGetCategoriesQuery,
   useGetBrandsQuery,
 } from "../app/apiSlice";
@@ -21,20 +20,17 @@ export default function PurchaseHistory() {
   const [searchParams] = useSearchParams();
   const { data: purchasesRes, isLoading } = useGetPurchasesQuery({ limit: 1000 });
   const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
-  const { data: suppliersRes } = useGetSuppliersQuery();
   const { data: categoriesRes } = useGetCategoriesQuery();
   const { data: brandsRes } = useGetBrandsQuery();
 
   const purchases = purchasesRes?.data ?? [];
   const products = productsRes?.data ?? [];
-  const suppliers = suppliersRes?.data ?? [];
   const categories = categoriesRes?.data ?? [];
   const brands = brandsRes?.data ?? [];
 
   const [productId, setProductId] = useState(searchParams.get("product") ?? "all");
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
-  const [supplierId, setSupplierId] = useState("all");
 
   const joined = useMemo(
     () =>
@@ -43,7 +39,6 @@ export default function PurchaseHistory() {
         productName: p.product?.name ?? "Unknown product",
         brandName: p.product?.brand?.name ?? "",
         categoryName: p.product?.category?.name ?? "",
-        supplierName: p.supplier?.name ?? "—",
         lineTotal: p.quantity * p.unitPrice,
       })),
     [purchases]
@@ -55,10 +50,9 @@ export default function PurchaseHistory() {
         (p) =>
           (productId === "all" || p.product?._id === productId) &&
           (category === "all" || p.categoryName === category) &&
-          (brand === "all" || p.brandName === brand) &&
-          (supplierId === "all" || p.supplier?._id === supplierId)
+          (brand === "all" || p.brandName === brand)
       ),
-    [joined, productId, category, brand, supplierId]
+    [joined, productId, category, brand]
   );
 
   const selectedProduct = products.find((p) => p._id === productId);
@@ -92,7 +86,7 @@ export default function PurchaseHistory() {
               { label: "Purchases", value: summary.count },
               { label: "Total quantity", value: formatNumber(summary.totalQuantity) },
               { label: "Total spent", value: formatCurrency(summary.totalSpent) },
-              { label: "Avg. unit price", value: formatCurrency(summary.avgUnitPrice) },
+              { label: "Avg. wholesale price", value: formatCurrency(summary.avgUnitPrice) },
             ]}
           />
         </div>
@@ -103,8 +97,8 @@ export default function PurchaseHistory() {
           <SkeletonRows rows={8} cols={6} />
         ) : (
           <DataTable
-            searchKeys={["productName", "supplierName"]}
-            searchPlaceholder="Search product or supplier…"
+            searchKeys={["productName"]}
+            searchPlaceholder="Search product…"
             filters={
               <>
                 <Select value={productId} onChange={(e) => setProductId(e.target.value)} className="!h-8.5 w-44 !text-[13px]">
@@ -125,12 +119,6 @@ export default function PurchaseHistory() {
                     <option key={b._id} value={b.name}>{b.name}</option>
                   ))}
                 </Select>
-                <Select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="!h-8.5 w-44 !text-[13px]">
-                  <option value="all">All suppliers</option>
-                  {suppliers.map((s) => (
-                    <option key={s._id} value={s._id}>{s.name}</option>
-                  ))}
-                </Select>
               </>
             }
             columns={[
@@ -145,9 +133,8 @@ export default function PurchaseHistory() {
                   </button>
                 ) },
               { key: "quantity", header: "Qty", align: "right", mono: true },
-              { key: "unitPrice", header: "Unit price", align: "right", mono: true, render: (r) => formatCurrency(r.unitPrice) },
+              { key: "unitPrice", header: "Wholesale price", align: "right", mono: true, render: (r) => formatCurrency(r.unitPrice) },
               { key: "lineTotal", header: "Total", align: "right", mono: true, render: (r) => formatCurrency(r.lineTotal) },
-              { key: "supplierName", header: "Supplier" },
               { key: "date", header: "Date", render: (r) => formatDate(r.date) },
             ]}
             rows={filtered}

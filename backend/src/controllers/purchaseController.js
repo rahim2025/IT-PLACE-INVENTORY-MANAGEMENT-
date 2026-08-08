@@ -38,8 +38,10 @@ export const listPurchases = asyncHandler(async (req, res) => {
 });
 
 // Stock-in entry point. Never edits a prior purchase's price — each purchase
-// is kept as its own historical record. Doesn't touch the product's
-// wholesale price; that's a plain field the owner sets/updates separately.
+// is kept as its own historical record. If a wholesale price is entered here
+// it also updates the product's current wholesale price (same field the
+// owner can set from the Products page), so whichever place it was last
+// entered is what shows up everywhere else.
 export const createPurchase = asyncHandler(async (req, res) => {
   const { product: productId, quantity, unitPrice, supplier, date, notes } = req.body;
 
@@ -56,6 +58,7 @@ export const createPurchase = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
+  if (unitPrice) product.wholesalePrice = Number(unitPrice);
   product.currentStock += quantity;
   await product.save();
 
