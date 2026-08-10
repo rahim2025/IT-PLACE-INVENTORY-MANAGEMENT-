@@ -13,13 +13,14 @@ const POPULATE = [
 ];
 
 export const listProducts = asyncHandler(async (req, res) => {
-  const { search, category, brand, supplier, page = 1, limit = 10 } = req.query;
+  const { search, category, brand, supplier, shop, page = 1, limit = 10 } = req.query;
 
   const filter = {};
   if (search) filter.$text = { $search: search };
   if (category) filter.category = category;
   if (brand) filter.brand = brand;
   if (supplier) filter.supplier = supplier;
+  if (shop) filter.shop = shop;
 
   const pageNum = Math.max(Number(page) || 1, 1);
   // No upper cap here, unlike other list endpoints — the catalog is
@@ -58,13 +59,14 @@ export const getProduct = asyncHandler(async (req, res) => {
 // a plain user-set field: it's not recomputed from purchase history and can
 // be changed later via updateProduct.
 export const createProduct = asyncHandler(async (req, res) => {
-  const { name, brand, category, sellingPrice, quantity } = req.body;
+  const { name, brand, category, shop, sellingPrice, quantity } = req.body;
   const wholesalePrice = req.body.wholesalePrice ? Number(req.body.wholesalePrice) : 0;
 
   const product = await Product.create({
     name,
     brand,
     category: category || undefined,
+    shop,
     sellingPrice: sellingPrice || undefined,
     wholesalePrice: req.body.wholesalePrice ? wholesalePrice : undefined,
     createdBy: req.user._id,
@@ -99,7 +101,7 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {
-  const { name, brand, category, barcode, description, sellingPrice, wholesalePrice, supplier, image } = req.body;
+  const { name, brand, category, shop, barcode, description, sellingPrice, wholesalePrice, supplier, image } = req.body;
 
   const product = await Product.findById(req.params.id);
   if (!product) throw new ApiError(404, "Product not found.");
@@ -107,6 +109,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   if (name !== undefined) product.name = name;
   if (brand !== undefined) product.brand = brand;
   if (category !== undefined) product.category = category || undefined;
+  if (shop !== undefined) product.shop = shop;
   if (barcode !== undefined) product.barcode = barcode || undefined;
   if (description !== undefined) product.description = description;
   if (sellingPrice !== undefined) product.sellingPrice = sellingPrice;

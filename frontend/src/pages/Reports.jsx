@@ -3,6 +3,7 @@ import { useDispatch } from "react-redux";
 import { Printer, Download, FileBarChart2, FileText } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
+import { Select } from "../components/ui/Field";
 import Button from "../components/ui/Button";
 import AssetTag from "../components/ui/AssetTag";
 import DataTable from "../components/ui/DataTable";
@@ -10,7 +11,7 @@ import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { useGetReportQuery, useLazyGetInvoiceQuery } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
-import { formatCurrency, formatDate } from "../lib/format";
+import { formatCurrency, formatDate, toLocalDateInput } from "../lib/format";
 import { downloadInvoicePdf } from "../lib/invoicePdf";
 import { cn } from "../lib/cn";
 
@@ -42,7 +43,7 @@ const INVOICE_MODES = [
   { key: "date", label: "Specific date" },
 ];
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => toLocalDateInput();
 
 function toCSV(rows) {
   const header = ["Type", "Detail", "Amount", "Date"];
@@ -139,6 +140,7 @@ export default function Reports() {
   const [sections, setSections] = useState({ sales: true, employeeCost: true, brokerCost: true, expenses: true });
   const [invoiceMode, setInvoiceMode] = useState("today");
   const [specificDate, setSpecificDate] = useState(today());
+  const [invoiceShop, setInvoiceShop] = useState("all");
   const [triggerInvoice, { data: invoiceRes, isFetching: invoiceLoading }] = useLazyGetInvoiceQuery();
   const invoice = invoiceRes?.data;
 
@@ -150,7 +152,7 @@ export default function Reports() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `it-place-report-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `it-place-report-${period}-${toLocalDateInput()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -163,6 +165,7 @@ export default function Reports() {
     try {
       const params = { mode: invoiceMode };
       if (invoiceMode === "date") params.date = specificDate;
+      if (invoiceShop !== "all") params.shop = invoiceShop;
       const result = await triggerInvoice(params).unwrap();
       downloadInvoicePdf(result.data, sections, computeInvoiceTotals(result.data, sections));
     } catch (err) {
@@ -181,7 +184,8 @@ export default function Reports() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `invoice-${invoiceMode}-${new Date().toISOString().slice(0, 10)}.csv`;
+    const shopSlug = invoice.shop && invoice.shop !== "All shops" ? `-${invoice.shop.toLowerCase().replace(/\s+/g, "-")}` : "";
+    a.download = `invoice-${invoiceMode}${shopSlug}-${toLocalDateInput()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -257,6 +261,18 @@ export default function Reports() {
             </div>
           </div>
 
+          <div>
+            <p className="mb-2 text-[13px] font-medium text-text-muted">Shop</p>
+            <Select value={invoiceShop} onChange={(e) => setInvoiceShop(e.target.value)} className="!h-9 w-44">
+              <option value="all">All shops (sales combined)</option>
+              <option value="Shop 1">Shop 1 only</option>
+              <option value="Shop 2">Shop 2 only</option>
+            </Select>
+            <p className="mt-1.5 text-[12px] text-text-faint">
+              Only the Sales section is shop-specific — costs (payroll, broker, expenses) apply to the whole business.
+            </p>
+          </div>
+
           <Button onClick={handleGenerateInvoice} disabled={invoiceLoading || noSectionsChosen}>
             <FileText size={15} /> {invoiceLoading ? "Generating…" : "Generate & download PDF"}
           </Button>
@@ -273,6 +289,9 @@ export default function Reports() {
               {invoice.company.supportEmail && <p className="text-[13px] text-text-muted">{invoice.company.supportEmail}</p>}
               <p className="mt-1.5 text-[13px] text-text-muted">
                 Period: <span className="font-medium text-text">{formatDate(invoice.range.start)} – {formatDate(invoice.range.end)}</span>
+              </p>
+              <p className="text-[13px] text-text-muted">
+                Shop: <span className="font-medium text-text">{invoice.shop}</span>
               </p>
             </div>
             <div className="flex gap-2">

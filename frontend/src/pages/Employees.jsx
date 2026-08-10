@@ -20,9 +20,9 @@ import {
   useCreateEmployeeTransactionMutation,
 } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
-import { formatCurrency, formatDate } from "../lib/format";
+import { formatCurrency, formatDate, toLocalDateInput } from "../lib/format";
 
-const emptyEmployeeForm = { name: "", email: "", position: "", monthlySalary: "", joinDate: new Date().toISOString().slice(0, 10) };
+const emptyEmployeeForm = { name: "", email: "", position: "", monthlySalary: "", joinDate: toLocalDateInput() };
 const TYPE_TONE = { Advance: "trace", Payout: "solder", Other: "neutral" };
 
 function EditEmployeeModal({ employee, onClose }) {
@@ -34,7 +34,7 @@ function EditEmployeeModal({ employee, onClose }) {
     email: employee?.email ?? "",
     position: employee?.position ?? "",
     monthlySalary: employee?.monthlySalary ?? "",
-    joinDate: employee?.joinDate ? employee.joinDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
+    joinDate: employee?.joinDate ? employee.joinDate.slice(0, 10) : toLocalDateInput(),
   }));
   const [errors, setErrors] = useState({});
   const [error, setError] = useState("");

@@ -9,6 +9,7 @@ const router = Router();
 const identityRules = [
   body("name").trim().notEmpty().withMessage("Product name is required."),
   body("brand").isMongoId().withMessage("Choose a valid brand."),
+  body("shop").isIn(["Shop 1", "Shop 2"]).withMessage("Choose Shop 1 or Shop 2."),
 ];
 
 const createProductRules = [

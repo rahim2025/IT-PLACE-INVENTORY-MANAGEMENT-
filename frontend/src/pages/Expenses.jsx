@@ -13,10 +13,10 @@ import { SkeletonRows } from "../components/ui/Skeleton";
 import { useGetExpensesQuery, useGetEmployeesQuery, useCreateExpenseMutation } from "../app/apiSlice";
 import { selectThemeMode } from "../features/theme/themeSlice";
 import { pushed } from "../features/toast/toastSlice";
-import { formatCurrency, formatDate } from "../lib/format";
+import { formatCurrency, formatDate, toLocalDateInput } from "../lib/format";
 import { CHART_COLORS, CHART_GRID_LIGHT, CHART_GRID_DARK } from "../lib/colors";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => toLocalDateInput();
 
 export default function Expenses() {
   const dispatch = useDispatch();

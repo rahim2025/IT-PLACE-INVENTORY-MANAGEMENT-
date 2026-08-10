@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatCurrency, formatDate } from "./format";
+import { formatCurrency, formatDate, toLocalDateInput } from "./format";
 
 const PAGE_BOTTOM = 280;
 const MARGIN_LEFT = 14;
@@ -72,6 +72,8 @@ export function downloadInvoicePdf(invoice, sections, totals) {
 
   doc.setFontSize(10.5);
   doc.text(`Period: ${formatDate(invoice.range.start)} - ${formatDate(invoice.range.end)}`, MARGIN_LEFT, y + 3);
+  y += 5;
+  doc.text(`Shop: ${invoice.shop ?? "All shops"}`, MARGIN_LEFT, y + 3);
   y += 12;
 
   if (sections.sales) {
@@ -129,5 +131,6 @@ export function downloadInvoicePdf(invoice, sections, totals) {
   doc.text(`Net: ${formatCurrency(totals.net)}`, MARGIN_LEFT, y);
   doc.setFont(undefined, "normal");
 
-  doc.save(`invoice-${new Date().toISOString().slice(0, 10)}.pdf`);
+  const shopSlug = invoice.shop && invoice.shop !== "All shops" ? `-${invoice.shop.toLowerCase().replace(/\s+/g, "-")}` : "";
+  doc.save(`invoice${shopSlug}-${toLocalDateInput()}.pdf`);
 }

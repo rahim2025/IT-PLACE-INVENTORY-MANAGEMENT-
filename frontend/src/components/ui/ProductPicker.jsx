@@ -57,7 +57,7 @@ export default function ProductPicker({ products, value, onChange, placeholder =
                 className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-bg-sunken"
               >
                 <span className="truncate text-[13.5px] text-text">{p.name}</span>
-                <span className="shrink-0 text-[11.5px] text-text-faint">{p.brand?.name} · {p.currentStock} in stock</span>
+                <span className="shrink-0 text-[11.5px] text-text-faint">{p.brand?.name} · {p.shop} · {p.currentStock} in stock</span>
               </button>
             ))
           )}

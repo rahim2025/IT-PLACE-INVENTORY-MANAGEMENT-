@@ -3,9 +3,10 @@ import { useDispatch } from "react-redux";
 import { Plus, ShoppingCart, Trash2 } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
-import { Input, Textarea, Label, FieldGroup } from "../components/ui/Field";
+import { Input, Select, Textarea, Label, FieldGroup } from "../components/ui/Field";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
+import AssetTag from "../components/ui/AssetTag";
 import DataTable from "../components/ui/DataTable";
 import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRows } from "../components/ui/Skeleton";
@@ -13,10 +14,11 @@ import StatusStrip from "../components/dashboard/StatusStrip";
 import ProductPicker from "../components/ui/ProductPicker";
 import { useGetProductsQuery, useGetSalesQuery, useCreateSaleMutation } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
-import { formatCurrency, formatDate } from "../lib/format";
+import { formatCurrency, formatDate, toLocalDateInput } from "../lib/format";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => toLocalDateInput();
 const emptyItem = () => ({ productId: "", quantity: 1, unitPrice: "" });
+const SHOP_TONE = { "Shop 1": "neutral", "Shop 2": "rose" };
 
 function RecordSaleModal({ open, onClose }) {
   const dispatch = useDispatch();
@@ -25,18 +27,29 @@ function RecordSaleModal({ open, onClose }) {
 
   const products = productsRes?.data ?? [];
 
+  // No "all shops" choice — a sale happens at one physical shop, and every
+  // item in it must come from that shop's stock (enforced server-side too).
+  const [shop, setShop] = useState("");
   const [items, setItems] = useState([emptyItem()]);
   const [date, setDate] = useState(today());
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
 
+  const shopProducts = useMemo(() => products.filter((p) => p.shop === shop), [products, shop]);
+
   const totalAmount = items.reduce((sum, item) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 0), 0);
 
   function reset() {
+    setShop("");
     setItems([emptyItem()]);
     setDate(today());
     setNotes("");
     setError("");
+  }
+
+  function changeShop(value) {
+    setShop(value);
+    setItems((list) => list.map((it) => ({ ...it, productId: "" })));
   }
 
   function updateItem(index, field, value) {
@@ -55,6 +68,10 @@ function RecordSaleModal({ open, onClose }) {
     e.preventDefault();
     setError("");
 
+    if (!shop) {
+      setError("Choose a shop before adding products.");
+      return;
+    }
     if (items.some((it) => !it.productId)) {
       setError("Choose a product for every line item.");
       return;
@@ -77,6 +94,7 @@ function RecordSaleModal({ open, onClose }) {
 
     try {
       await createSale({
+        shop,
         items: items.map((it) => ({ product: it.productId, quantity: Number(it.quantity), unitPrice: Number(it.unitPrice) })),
         date,
         notes: notes.trim(),
@@ -101,13 +119,27 @@ function RecordSaleModal({ open, onClose }) {
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        <FieldGroup>
+          <Label htmlFor="sale-shop" hint="every item in this sale comes from its stock">Shop</Label>
+          <Select id="sale-shop" value={shop} onChange={(e) => changeShop(e.target.value)}>
+            <option value="" disabled>Select a shop</option>
+            <option value="Shop 1">Shop 1</option>
+            <option value="Shop 2">Shop 2</option>
+          </Select>
+        </FieldGroup>
+
         <div>
           <Label>Products sold</Label>
           <div className="space-y-2">
-            {items.map((item, index) => (
+            {!shop ? (
+              <p className="rounded-[6px] border border-dashed border-border-strong px-3 py-2.5 text-[13px] text-text-faint">
+                Choose a shop above to search its products.
+              </p>
+            ) : (
+              items.map((item, index) => (
               <div key={index} className="flex items-center gap-2">
                 <ProductPicker
-                  products={products}
+                  products={shopProducts}
                   value={item.productId}
                   onChange={(id) => updateItem(index, "productId", id)}
                   placeholder="Search products…"
@@ -139,11 +171,14 @@ function RecordSaleModal({ open, onClose }) {
                   <Trash2 size={15} />
                 </button>
               </div>
-            ))}
+              ))
+            )}
           </div>
-          <button type="button" onClick={addItem} className="mt-2 text-[12.5px] font-medium text-rose hover:underline">
-            + Add another product
-          </button>
+          {shop && (
+            <button type="button" onClick={addItem} className="mt-2 text-[12.5px] font-medium text-rose hover:underline">
+              + Add another product
+            </button>
+          )}
         </div>
 
         <FieldGroup>
@@ -175,14 +210,16 @@ function RecordSaleModal({ open, onClose }) {
 export default function SaleUpdate() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [shopFilter, setShopFilter] = useState("all");
   const [recordOpen, setRecordOpen] = useState(false);
 
   const queryParams = useMemo(() => {
     const params = { limit: 200 };
     if (from) params.from = from;
     if (to) params.to = to;
+    if (shopFilter !== "all") params.shop = shopFilter;
     return params;
-  }, [from, to]);
+  }, [from, to, shopFilter]);
 
   const { data: salesRes, isLoading } = useGetSalesQuery(queryParams);
   const sales = salesRes?.data ?? [];
@@ -207,8 +244,8 @@ export default function SaleUpdate() {
 
   function setThisMonth() {
     const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const first = toLocalDateInput(new Date(now.getFullYear(), now.getMonth(), 1));
+    const last = toLocalDateInput(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     setFrom(first);
     setTo(last);
   }
@@ -241,7 +278,7 @@ export default function SaleUpdate() {
 
       <Card>
         {isLoading ? (
-          <SkeletonRows rows={7} cols={4} />
+          <SkeletonRows rows={7} cols={5} />
         ) : (
           <DataTable
             filters={
@@ -260,10 +297,16 @@ export default function SaleUpdate() {
                     Clear
                   </button>
                 )}
+                <Select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                  <option value="all">All shops</option>
+                  <option value="Shop 1">Shop 1</option>
+                  <option value="Shop 2">Shop 2</option>
+                </Select>
               </>
             }
             columns={[
               { key: "date", header: "Date", render: (r) => formatDate(r.date) },
+              { key: "shop", header: "Shop", render: (r) => <AssetTag tone={SHOP_TONE[r.shop]}>{r.shop}</AssetTag> },
               { key: "itemsLabel", header: "Items sold", render: (r) => <span className="text-[12.5px] text-text-muted">{r.itemsLabel}</span> },
               { key: "itemCount", header: "Qty", align: "right", mono: true },
               { key: "totalAmount", header: "Total", align: "right", mono: true, render: (r) => formatCurrency(r.totalAmount) },

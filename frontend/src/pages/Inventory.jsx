@@ -15,6 +15,7 @@ import { formatCurrency, formatNumber } from "../lib/format";
 
 const STOCK_TONE = { ok: "solder", low: "trace", out: "fault" };
 const STOCK_LABEL = { ok: "Healthy", low: "Low stock", out: "Out of stock" };
+const SHOP_TONE = { "Shop 1": "neutral", "Shop 2": "rose" };
 
 function StatTile({ label, value, tone }) {
   return (
@@ -36,13 +37,16 @@ export default function Inventory() {
   const products = productsRes?.data ?? [];
 
   const [statusFilter, setStatusFilter] = useState("all");
+  const [shopFilter, setShopFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [productId, setProductId] = useState("");
   const [delta, setDelta] = useState("");
   const [reason, setReason] = useState("");
   const [errors, setErrors] = useState({});
 
-  const filteredRows = rows.filter((r) => statusFilter === "all" || r.stockStatus === statusFilter);
+  const filteredRows = rows.filter(
+    (r) => (statusFilter === "all" || r.stockStatus === statusFilter) && (shopFilter === "all" || r.shop === shopFilter)
+  );
 
   function resetForm() {
     setProductId("");
@@ -96,23 +100,31 @@ export default function Inventory() {
       <Card className="mt-5">
         <CardHeader title="Stock by product" />
         {isLoading ? (
-          <SkeletonRows rows={8} cols={6} />
+          <SkeletonRows rows={8} cols={7} />
         ) : (
           <DataTable
             searchKeys={["name"]}
             searchPlaceholder="Search products…"
             filters={
-              <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="!h-8.5 w-40 !text-[13px]">
-                <option value="all">All statuses</option>
-                <option value="ok">Healthy</option>
-                <option value="low">Low stock</option>
-                <option value="out">Out of stock</option>
-              </Select>
+              <>
+                <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="!h-8.5 w-40 !text-[13px]">
+                  <option value="all">All statuses</option>
+                  <option value="ok">Healthy</option>
+                  <option value="low">Low stock</option>
+                  <option value="out">Out of stock</option>
+                </Select>
+                <Select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                  <option value="all">All shops</option>
+                  <option value="Shop 1">Shop 1</option>
+                  <option value="Shop 2">Shop 2</option>
+                </Select>
+              </>
             }
             columns={[
               { key: "name", header: "Product", render: (r) => <span className="font-medium text-text">{r.name}</span> },
               { key: "brand", header: "Brand", render: (r) => r.brand?.name ?? "—" },
               { key: "category", header: "Category", render: (r) => r.category?.name ?? "—" },
+              { key: "shop", header: "Shop", render: (r) => <AssetTag tone={SHOP_TONE[r.shop]}>{r.shop}</AssetTag> },
               { key: "currentStock", header: "Stock", align: "right", mono: true },
               { key: "wholesalePrice", header: "Wholesale price", align: "right", mono: true, render: (r) => (r.wholesalePrice ? formatCurrency(r.wholesalePrice) : "—") },
               { key: "value", header: "Value", align: "right", mono: true, render: (r) => formatCurrency(r.value) },
@@ -140,7 +152,7 @@ export default function Inventory() {
             <Select id="adj-product" value={productId} onChange={(e) => setProductId(e.target.value)}>
               <option value="">Select a product</option>
               {products.map((p) => (
-                <option key={p._id} value={p._id}>{p.name}</option>
+                <option key={p._id} value={p._id}>{p.name} ({p.shop})</option>
               ))}
             </Select>
             <FieldError>{errors.productId}</FieldError>

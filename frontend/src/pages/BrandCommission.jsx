@@ -8,9 +8,9 @@ import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import StatusStrip from "../components/dashboard/StatusStrip";
 import { useGetBrandsQuery, useGetSalesQuery } from "../app/apiSlice";
-import { formatCurrency, formatDate, formatNumber } from "../lib/format";
+import { formatCurrency, formatDate, formatNumber, toLocalDateInput } from "../lib/format";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => toLocalDateInput();
 
 export default function BrandCommission() {
   const { data: brandsRes } = useGetBrandsQuery();
@@ -73,8 +73,8 @@ export default function BrandCommission() {
 
   function setThisMonth() {
     const now = new Date();
-    const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const first = toLocalDateInput(new Date(now.getFullYear(), now.getMonth(), 1));
+    const last = toLocalDateInput(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     setFrom(first);
     setTo(last);
   }

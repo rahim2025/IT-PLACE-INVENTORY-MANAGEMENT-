@@ -6,10 +6,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { logActivity } from "../utils/logActivity.js";
 
 export const getStockOverview = asyncHandler(async (req, res) => {
-  const { status } = req.query; // "low" | "out" | undefined
+  const { status, shop } = req.query; // status: "low" | "out" | undefined
   const settings = await Settings.getSingleton();
 
-  const products = await Product.find()
+  const products = await Product.find(shop ? { shop } : {})
     .populate([{ path: "brand", select: "name" }, { path: "category", select: "name" }])
     .sort({ name: 1 });
 

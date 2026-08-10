@@ -31,6 +31,7 @@ export default function PurchaseHistory() {
   const [productId, setProductId] = useState(searchParams.get("product") ?? "all");
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
+  const [shop, setShop] = useState("all");
 
   const joined = useMemo(
     () =>
@@ -39,6 +40,7 @@ export default function PurchaseHistory() {
         productName: p.product?.name ?? "Unknown product",
         brandName: p.product?.brand?.name ?? "",
         categoryName: p.product?.category?.name ?? "",
+        shopName: p.product?.shop ?? "",
         lineTotal: p.quantity * p.unitPrice,
       })),
     [purchases]
@@ -50,9 +52,10 @@ export default function PurchaseHistory() {
         (p) =>
           (productId === "all" || p.product?._id === productId) &&
           (category === "all" || p.categoryName === category) &&
-          (brand === "all" || p.brandName === brand)
+          (brand === "all" || p.brandName === brand) &&
+          (shop === "all" || p.shopName === shop)
       ),
-    [joined, productId, category, brand]
+    [joined, productId, category, brand, shop]
   );
 
   const selectedProduct = products.find((p) => p._id === productId);
@@ -119,6 +122,11 @@ export default function PurchaseHistory() {
                     <option key={b._id} value={b.name}>{b.name}</option>
                   ))}
                 </Select>
+                <Select value={shop} onChange={(e) => setShop(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                  <option value="all">All shops</option>
+                  <option value="Shop 1">Shop 1</option>
+                  <option value="Shop 2">Shop 2</option>
+                </Select>
               </>
             }
             columns={[
@@ -129,7 +137,7 @@ export default function PurchaseHistory() {
                     className="text-left hover:underline"
                   >
                     <p className="font-medium text-text">{r.productName}</p>
-                    <p className="text-[12px] text-text-faint">{r.brandName} · {r.categoryName}</p>
+                    <p className="text-[12px] text-text-faint">{r.brandName} · {r.categoryName} · {r.shopName}</p>
                   </button>
                 ) },
               { key: "quantity", header: "Qty", align: "right", mono: true },

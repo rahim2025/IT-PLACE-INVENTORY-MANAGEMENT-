@@ -17,7 +17,7 @@ const POPULATE = [
 ];
 
 export const listSales = asyncHandler(async (req, res) => {
-  const { from, to, page = 1, limit = 15 } = req.query;
+  const { from, to, shop, page = 1, limit = 15 } = req.query;
 
   const filter = {};
   if (from || to) {
@@ -25,6 +25,7 @@ export const listSales = asyncHandler(async (req, res) => {
     if (from) filter.date.$gte = new Date(from);
     if (to) filter.date.$lte = new Date(to);
   }
+  if (shop) filter.shop = shop;
 
   const pageNum = Math.max(Number(page) || 1, 1);
   const limitNum = Math.min(Math.max(Number(limit) || 15, 1), 100);
@@ -45,7 +46,7 @@ export const listSales = asyncHandler(async (req, res) => {
 // InventoryLog entry behind for each — the same audit trail every other
 // stock movement (purchases, adjustments) already follows.
 export const createSale = asyncHandler(async (req, res) => {
-  const { items, date, notes } = req.body;
+  const { items, shop, date, notes } = req.body;
 
   const productIds = items.map((i) => i.product);
   const products = await Product.find({ _id: { $in: productIds } });
@@ -60,12 +61,15 @@ export const createSale = asyncHandler(async (req, res) => {
     if (product.currentStock < item.quantity) {
       throw new ApiError(400, `Not enough stock for "${product.name}". Only ${product.currentStock} available.`);
     }
+    if (product.shop !== shop) {
+      throw new ApiError(400, `"${product.name}" belongs to ${product.shop}, not ${shop}. A sale can only include products from one shop.`);
+    }
   }
 
   const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
   const saleDate = date || Date.now();
 
-  const sale = await Sale.create({ items, totalAmount, date: saleDate, notes, createdBy: req.user._id });
+  const sale = await Sale.create({ items, shop, totalAmount, date: saleDate, notes, createdBy: req.user._id });
 
   for (const item of items) {
     const product = productById.get(String(item.product));

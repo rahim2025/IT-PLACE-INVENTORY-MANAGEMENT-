@@ -127,13 +127,17 @@ function getInvoiceRange(mode, dateStr) {
 // "Credit" just records an accrued liability, no money has moved yet. This
 // keeps every cost section on the same cash-basis footing as Expenses.
 export const getInvoice = asyncHandler(async (req, res) => {
-  const { mode = "today", date } = req.query;
+  const { mode = "today", date, shop } = req.query;
   const { start, end } = getInvoiceRange(mode, date);
   const range = { $gte: start, $lte: end };
 
+  // Only sales carry a shop — employee/broker/expense costs are whole-business,
+  // so they're never filtered here even when a specific shop is requested.
+  const saleFilter = shop ? { date: range, shop } : { date: range };
+
   const [settings, sales, employeeTx, brokerPayments, expenses] = await Promise.all([
     Settings.getSingleton(),
-    Sale.find({ date: range }).populate({ path: "items.product", select: "name" }).lean(),
+    Sale.find(saleFilter).populate({ path: "items.product", select: "name" }).lean(),
     EmployeeTransaction.find({ date: range }).populate({ path: "employee", select: "name" }).lean(),
     BrokerTransaction.find({ date: range, type: "Payment" }).populate({ path: "broker", select: "name" }).lean(),
     Expense.find({ date: range }).lean(),
@@ -173,6 +177,7 @@ export const getInvoice = asyncHandler(async (req, res) => {
     data: {
       company: { name: settings.shopName, address: settings.address, supportEmail: settings.supportEmail },
       range: { start, end },
+      shop: shop || "All shops",
       sales: {
         count: sales.length,
         quantity: saleItems.reduce((s, i) => s + i.quantity, 0),

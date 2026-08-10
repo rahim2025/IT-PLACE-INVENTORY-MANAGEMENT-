@@ -6,7 +6,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { logActivity } from "../utils/logActivity.js";
 
 const POPULATE = [
-  { path: "product", select: "name brand category", populate: ["brand", "category"] },
+  { path: "product", select: "name brand category shop", populate: ["brand", "category"] },
   { path: "supplier", select: "name" },
 ];
 

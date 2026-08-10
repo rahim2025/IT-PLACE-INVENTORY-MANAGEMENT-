@@ -3,13 +3,14 @@ import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import { Card, CardHeader, CardBody } from "../components/ui/Card";
-import { Input, Label, FieldGroup, FieldError } from "../components/ui/Field";
+import { Input, Select, Label, FieldGroup, FieldError } from "../components/ui/Field";
 import Button from "../components/ui/Button";
 import ProductPicker from "../components/ui/ProductPicker";
 import { useGetProductsQuery, useCreatePurchaseMutation } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
+import { toLocalDateInput } from "../lib/format";
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => toLocalDateInput();
 
 export default function PurchaseEntry() {
   const dispatch = useDispatch();
@@ -19,11 +20,17 @@ export default function PurchaseEntry() {
 
   const products = productsRes?.data ?? [];
 
+  const [shopFilter, setShopFilter] = useState("all");
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [wholesalePrice, setWholesalePrice] = useState("");
   const [date, setDate] = useState(today());
   const [errors, setErrors] = useState({});
+
+  const shopFilteredProducts = useMemo(
+    () => (shopFilter === "all" ? products : products.filter((p) => p.shop === shopFilter)),
+    [products, shopFilter]
+  );
 
   const selectedProduct = products.find((p) => p._id === productId);
 
@@ -76,10 +83,26 @@ export default function PurchaseEntry() {
           <CardHeader title="New purchase" />
           <CardBody>
             <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-              <FieldGroup className="sm:col-span-2">
+              <FieldGroup>
+                <Label htmlFor="shopFilter" hint="narrows the product search below">Shop</Label>
+                <Select
+                  id="shopFilter"
+                  value={shopFilter}
+                  onChange={(e) => {
+                    setShopFilter(e.target.value);
+                    setProductId("");
+                  }}
+                >
+                  <option value="all">All shops</option>
+                  <option value="Shop 1">Shop 1</option>
+                  <option value="Shop 2">Shop 2</option>
+                </Select>
+              </FieldGroup>
+
+              <FieldGroup>
                 <Label htmlFor="product">Product</Label>
                 <ProductPicker
-                  products={products}
+                  products={shopFilteredProducts}
                   value={productId}
                   onChange={setProductId}
                   placeholder="Search products…"

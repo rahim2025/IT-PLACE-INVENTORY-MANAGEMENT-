@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/ui/Card";
-import { Input, Label, FieldError } from "../components/ui/Field";
+import { Input, Select, Label, FieldError } from "../components/ui/Field";
 import Button from "../components/ui/Button";
 import {
   useGetCategoriesQuery,
@@ -20,12 +20,13 @@ const emptyRow = () => ({
   name: "",
   brand: "",
   category: "",
+  shop: "Shop 1",
   quantity: "",
   wholesalePrice: "",
   sellingPrice: "",
 });
 
-const ROW_GRID = "grid grid-cols-[minmax(180px,2fr)_minmax(130px,1.1fr)_minmax(130px,1.1fr)_84px_112px_140px_32px] gap-2";
+const ROW_GRID = "grid grid-cols-[minmax(180px,2fr)_minmax(130px,1.1fr)_minmax(130px,1.1fr)_100px_84px_112px_140px_32px] gap-2";
 
 function validateRow(row) {
   const errors = [];
@@ -114,6 +115,7 @@ export default function AddProduct() {
           name: row.name.trim(),
           brand: brandId,
           category: categoryId,
+          shop: row.shop,
           quantity: Number(row.quantity),
           wholesalePrice: row.wholesalePrice === "" ? undefined : Number(row.wholesalePrice),
           sellingPrice: row.sellingPrice.trim() || undefined,
@@ -152,11 +154,12 @@ export default function AddProduct() {
         <CardBody>
           <form onSubmit={handleSubmit}>
             <div className="overflow-x-auto">
-              <div className="min-w-[900px]">
+              <div className="min-w-[1000px]">
                 <div className={ROW_GRID}>
                   <Label>Product name</Label>
                   <Label>Brand</Label>
                   <Label>Category (optional)</Label>
+                  <Label>Shop</Label>
                   <Label>Qty</Label>
                   <Label>Wholesale price (optional)</Label>
                   <Label>Selling price (optional)</Label>
@@ -187,6 +190,15 @@ export default function AddProduct() {
                           onChange={(e) => updateRow(row.key, "category", e.target.value)}
                           placeholder="Type or pick"
                         />
+                        <Select
+                          aria-label="Shop"
+                          value={row.shop}
+                          onChange={(e) => updateRow(row.key, "shop", e.target.value)}
+                          className="!h-10"
+                        >
+                          <option value="Shop 1">Shop 1</option>
+                          <option value="Shop 2">Shop 2</option>
+                        </Select>
                         <Input
                           aria-label="Starting quantity"
                           type="number"
