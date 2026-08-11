@@ -35,30 +35,71 @@ const STATUS_TONE = { Due: "rose", Paid: "solder" };
 const TYPE_LABEL = { due: "Due", credit: "Credit" };
 const TYPE_TONE = { due: "neutral", credit: "trace" };
 
-function AddDueModal({ open, onClose }) {
+// presetCustomer, when given, locks the record to that customer instead of
+// asking for a name — used when adding another due/credit from inside a
+// customer's own history view, so there's no need to re-search for someone
+// who's already right there on screen.
+function AddDueModal({ open, presetCustomer, onClose }) {
   const dispatch = useDispatch();
   const { data: customersRes } = useGetCustomersQuery();
   const { data: productsRes } = useGetProductsQuery({ limit: 100000 });
+  const { data: existingDuesRes } = useGetDuesQuery(
+    { customer: presetCustomer?._id, limit: 200 },
+    { skip: !presetCustomer }
+  );
   const [createCustomer] = useCreateCustomerMutation();
-  const [createDue, { isLoading: saving }] = useCreateDueMutation();
+  const [createDue, { isLoading: creating }] = useCreateDueMutation();
+  const [updateDue, { isLoading: adjusting }] = useUpdateDueMutation();
+  const [createPayment, { isLoading: netting }] = useCreateDuePaymentMutation();
+  const saving = creating || adjusting || netting;
 
   const customers = customersRes?.data ?? [];
   const products = productsRes?.data ?? [];
+  const existingDues = existingDuesRes?.data ?? [];
 
   const [type, setType] = useState("due");
-  const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
+  const [forceNew, setForceNew] = useState(false);
+  const [customerName, setCustomerName] = useState(presetCustomer?.name ?? "");
+  const [customerEmail, setCustomerEmail] = useState(presetCustomer?.email ?? "");
   const [productId, setProductId] = useState("");
+  const [sign, setSign] = useState("add");
   const [dueAmount, setDueAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState({});
   const [error, setError] = useState("");
 
+  // If this customer already has an open record of the SAME type, adding
+  // "more" should top that one up rather than leaving two separate rows for
+  // the same running balance. If instead they have an open record of the
+  // OPPOSITE type, the new amount should net against it — a new $200 due
+  // against an existing $500 credit means the shop now owes $300, not "$500
+  // credit AND $200 due" sitting side by side. forceNew lets the owner opt
+  // out of both and create a separate record anyway.
+  const sameTypeMatch = useMemo(() => {
+    if (!presetCustomer) return null;
+    const matches = existingDues.filter((d) => d.type === type);
+    return matches.find((d) => d.remainingDue > 0) ?? matches[0] ?? null;
+  }, [existingDues, type, presetCustomer]);
+  const oppositeTypeMatch = useMemo(() => {
+    if (!presetCustomer) return null;
+    return existingDues.find((d) => d.type !== type && d.remainingDue > 0) ?? null;
+  }, [existingDues, type, presetCustomer]);
+
+  // "adjust" = same-type match, grow/shrink its total directly.
+  // "net" = opposite-type match, this amount offsets that balance instead
+  // (implemented as a payment against it, so overpaying it auto-flips the
+  // excess into a fresh record — same mechanism "Record payment" already uses).
+  const matchMode = forceNew ? null : sameTypeMatch ? "adjust" : oppositeTypeMatch ? "net" : null;
+  const matchedDue = matchMode === "adjust" ? sameTypeMatch : matchMode === "net" ? oppositeTypeMatch : null;
+  const hasAnyMatch = !!(sameTypeMatch || oppositeTypeMatch);
+
   function reset() {
     setType("due");
-    setCustomerName("");
-    setCustomerEmail("");
+    setForceNew(false);
+    setCustomerName(presetCustomer?.name ?? "");
+    setCustomerEmail(presetCustomer?.email ?? "");
     setProductId("");
+    setSign("add");
     setDueAmount("");
     setNotes("");
     setErrors({});
@@ -67,13 +108,18 @@ function AddDueModal({ open, onClose }) {
 
   function validate() {
     const next = {};
-    if (!customerName.trim()) next.customerName = "Enter the customer's name.";
-    if (!dueAmount || Number(dueAmount) <= 0) next.dueAmount = "Enter a due amount greater than zero.";
+    if (!presetCustomer && !customerName.trim()) next.customerName = "Enter the customer's name.";
+    if (!dueAmount || Number(dueAmount) <= 0) {
+      next.dueAmount = "Enter an amount greater than zero.";
+    } else if (matchMode === "adjust" && sign === "subtract" && matchedDue.dueAmount - Number(dueAmount) <= 0) {
+      next.dueAmount = `Can't subtract that much — it would bring the total to zero or below. Edit the record directly for that.`;
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
   async function resolveCustomerId() {
+    if (presetCustomer) return presetCustomer._id;
     const existing = customers.find((c) => c.name.toLowerCase() === customerName.trim().toLowerCase());
     if (existing) return existing._id;
     const res = await createCustomer({
@@ -88,22 +134,49 @@ function AddDueModal({ open, onClose }) {
     setError("");
     if (!validate()) return;
     try {
-      const customerId = await resolveCustomerId();
-      await createDue({
-        customer: customerId,
-        type,
-        product: productId || undefined,
-        dueAmount: Number(dueAmount),
-        notes: notes.trim(),
-      }).unwrap();
-      dispatch(
-        pushed({
-          message:
-            type === "credit"
-              ? `Credit of ${formatCurrency(Number(dueAmount))} recorded — to pay ${customerName.trim()}.`
-              : `Due of ${formatCurrency(Number(dueAmount))} recorded for ${customerName.trim()}.`,
-        })
-      );
+      const name = presetCustomer?.name ?? customerName.trim();
+
+      if (matchMode === "adjust") {
+        const delta = sign === "subtract" ? -Number(dueAmount) : Number(dueAmount);
+        const newAmount = Math.round((matchedDue.dueAmount + delta) * 100) / 100;
+        await updateDue({ id: matchedDue._id, dueAmount: newAmount }).unwrap();
+        dispatch(
+          pushed({
+            message: `${TYPE_LABEL[type]} for ${name} adjusted to ${formatCurrency(newAmount)}.`,
+          })
+        );
+      } else if (matchMode === "net") {
+        const result = await createPayment({
+          due: matchedDue._id,
+          amount: Number(dueAmount),
+          notes: notes.trim() || `Offset by a new ${TYPE_LABEL[type].toLowerCase()} entry.`,
+        }).unwrap();
+        const overflowDue = result.data.overflowDue;
+        dispatch(
+          pushed({
+            message: overflowDue
+              ? `${TYPE_LABEL[type]} of ${formatCurrency(Number(dueAmount))} recorded. ${name}'s ${TYPE_LABEL[matchedDue.type].toLowerCase()} was fully settled, and a new ${TYPE_LABEL[overflowDue.type].toLowerCase()} of ${formatCurrency(overflowDue.dueAmount)} was opened for the extra.`
+              : `${TYPE_LABEL[type]} of ${formatCurrency(Number(dueAmount))} recorded — offset against ${name}'s ${TYPE_LABEL[matchedDue.type].toLowerCase()} balance.`,
+          })
+        );
+      } else {
+        const customerId = await resolveCustomerId();
+        await createDue({
+          customer: customerId,
+          type,
+          product: productId || undefined,
+          dueAmount: Number(dueAmount),
+          notes: notes.trim(),
+        }).unwrap();
+        dispatch(
+          pushed({
+            message:
+              type === "credit"
+                ? `Credit of ${formatCurrency(Number(dueAmount))} recorded — to pay ${name}.`
+                : `Due of ${formatCurrency(Number(dueAmount))} recorded for ${name}.`,
+          })
+        );
+      }
       reset();
       onClose();
     } catch (err) {
@@ -118,8 +191,12 @@ function AddDueModal({ open, onClose }) {
         reset();
         onClose();
       }}
-      title="Add due record"
-      description="Type a new customer or company name or match an existing one — no need to add them separately first."
+      title={presetCustomer ? `Add due or credit — ${presetCustomer.name}` : "Add due record"}
+      description={
+        presetCustomer
+          ? "Record another due or credit for this customer."
+          : "Type a new customer or company name or match an existing one — no need to add them separately first."
+      }
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -149,48 +226,128 @@ function AddDueModal({ open, onClose }) {
           </div>
         </FieldGroup>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        {presetCustomer ? (
+          <div className="rounded-[6px] border border-border bg-bg-sunken px-3.5 py-2.5">
+            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Customer</p>
+            <p className="mt-0.5 text-[14px] font-medium text-text">{presetCustomer.name}</p>
+          </div>
+        ) : null}
+
+        {matchMode === "adjust" && (
+          <div className="rounded-[6px] border border-trace/40 bg-trace/10 px-3.5 py-2.5 text-[13px] text-text">
+            {presetCustomer.name} already has an open {TYPE_LABEL[type].toLowerCase()} of{" "}
+            <span className="font-mono font-medium">{formatCurrency(matchedDue.dueAmount)}</span>{" "}
+            ({formatCurrency(matchedDue.remainingDue)} remaining). Adjust it below, or{" "}
+            <button type="button" onClick={() => setForceNew(true)} className="font-medium text-rose hover:underline">
+              create a separate new record instead
+            </button>
+            .
+          </div>
+        )}
+
+        {matchMode === "net" && (
+          <div className="rounded-[6px] border border-trace/40 bg-trace/10 px-3.5 py-2.5 text-[13px] text-text">
+            {presetCustomer.name} has an open {TYPE_LABEL[matchedDue.type].toLowerCase()} of{" "}
+            <span className="font-mono font-medium">{formatCurrency(matchedDue.dueAmount)}</span>{" "}
+            ({formatCurrency(matchedDue.remainingDue)} remaining). This {TYPE_LABEL[type].toLowerCase()} will offset it instead of sitting as a separate record, or{" "}
+            <button type="button" onClick={() => setForceNew(true)} className="font-medium text-rose hover:underline">
+              create a separate new record instead
+            </button>
+            .
+          </div>
+        )}
+
+        {presetCustomer && hasAnyMatch && forceNew && (
+          <p className="text-[12.5px] text-text-faint">
+            Creating a separate new record.{" "}
+            <button type="button" onClick={() => setForceNew(false)} className="font-medium text-rose hover:underline">
+              Use the existing balance instead
+            </button>
+          </p>
+        )}
+
+        {!presetCustomer && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FieldGroup>
+              <Label htmlFor="due-customer-name" hint="type to add new">Customer or Company name</Label>
+              <Input
+                id="due-customer-name"
+                list="due-customer-options"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Select or type a customer"
+              />
+              <datalist id="due-customer-options">
+                {customers.map((c) => (
+                  <option key={c._id} value={c.name} />
+                ))}
+              </datalist>
+              <FieldError>{errors.customerName}</FieldError>
+            </FieldGroup>
+
+            <FieldGroup>
+              <Label htmlFor="due-customer-email" hint="optional">Customer email</Label>
+              <Input
+                id="due-customer-email"
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder="name@example.com"
+              />
+            </FieldGroup>
+          </div>
+        )}
+
+        {matchMode === null && (
           <FieldGroup>
-            <Label htmlFor="due-customer-name" hint="type to add new">Customer or Company name</Label>
-            <Input
-              id="due-customer-name"
-              list="due-customer-options"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Select or type a customer"
-            />
-            <datalist id="due-customer-options">
-              {customers.map((c) => (
-                <option key={c._id} value={c.name} />
+            <Label htmlFor="due-product" hint="optional">Product</Label>
+            <Select id="due-product" value={productId} onChange={(e) => setProductId(e.target.value)}>
+              <option value="">No specific product</option>
+              {products.map((p) => (
+                <option key={p._id} value={p._id}>{p.name}</option>
               ))}
-            </datalist>
-            <FieldError>{errors.customerName}</FieldError>
+            </Select>
           </FieldGroup>
+        )}
 
+        {matchMode === "adjust" && (
           <FieldGroup>
-            <Label htmlFor="due-customer-email" hint="optional">Customer email</Label>
-            <Input
-              id="due-customer-email"
-              type="email"
-              value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              placeholder="name@example.com"
-            />
+            <Label>Adjustment</Label>
+            <div className="inline-flex rounded-[6px] border border-border-strong bg-bg-sunken p-1">
+              <button
+                type="button"
+                onClick={() => setSign("add")}
+                className={cn(
+                  "rounded-[4px] px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+                  sign === "add" ? "bg-bg-elevated text-text shadow-sm" : "text-text-muted hover:text-text"
+                )}
+              >
+                + Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setSign("subtract")}
+                className={cn(
+                  "rounded-[4px] px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+                  sign === "subtract" ? "bg-bg-elevated text-text shadow-sm" : "text-text-muted hover:text-text"
+                )}
+              >
+                − Subtract
+              </button>
+            </div>
           </FieldGroup>
-        </div>
+        )}
 
         <FieldGroup>
-          <Label htmlFor="due-product" hint="optional">Product</Label>
-          <Select id="due-product" value={productId} onChange={(e) => setProductId(e.target.value)}>
-            <option value="">No specific product</option>
-            {products.map((p) => (
-              <option key={p._id} value={p._id}>{p.name}</option>
-            ))}
-          </Select>
-        </FieldGroup>
-
-        <FieldGroup>
-          <Label htmlFor="due-amount">{type === "credit" ? "Total amount to pay" : "Total due"}</Label>
+          <Label htmlFor="due-amount">
+            {matchMode === "adjust"
+              ? `Amount to ${sign === "subtract" ? "subtract" : "add"}`
+              : matchMode === "net"
+                ? `${TYPE_LABEL[type]} amount`
+                : type === "credit"
+                  ? "Total amount to pay"
+                  : "Total due"}
+          </Label>
           <Input
             id="due-amount"
             type="number"
@@ -201,12 +358,30 @@ function AddDueModal({ open, onClose }) {
             placeholder="0.00"
           />
           <FieldError>{errors.dueAmount}</FieldError>
+          {matchMode === "adjust" && dueAmount && !errors.dueAmount && (
+            <p className="mt-1.5 text-[12.5px] text-text-faint">
+              New total: {formatCurrency(Math.max(matchedDue.dueAmount + (sign === "subtract" ? -Number(dueAmount) : Number(dueAmount)), 0))}
+            </p>
+          )}
+          {matchMode === "net" && Number(dueAmount) > 0 && !errors.dueAmount && (
+            <p className="mt-1.5 text-[12.5px] text-text-faint">
+              {Number(dueAmount) >= matchedDue.remainingDue
+                ? `Settles the ${TYPE_LABEL[matchedDue.type].toLowerCase()}${
+                    Number(dueAmount) > matchedDue.remainingDue
+                      ? ` — the extra ${formatCurrency(Number(dueAmount) - matchedDue.remainingDue)} opens a new ${TYPE_LABEL[type].toLowerCase()} for ${presetCustomer.name}.`
+                      : "."
+                  }`
+                : `New ${TYPE_LABEL[matchedDue.type].toLowerCase()} remaining: ${formatCurrency(matchedDue.remainingDue - Number(dueAmount))}`}
+            </p>
+          )}
         </FieldGroup>
 
-        <FieldGroup>
-          <Label htmlFor="due-notes" hint="optional">Notes</Label>
-          <Textarea id="due-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Payment terms, approval context, etc." />
-        </FieldGroup>
+        {matchMode === null && (
+          <FieldGroup>
+            <Label htmlFor="due-notes" hint="optional">Notes</Label>
+            <Textarea id="due-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Payment terms, approval context, etc." />
+          </FieldGroup>
+        )}
 
         {error && <p className="text-[12.5px] text-fault">{error}</p>}
 
@@ -400,7 +575,7 @@ function PaymentModal({ due, onClose }) {
 // Consolidated view for one customer — every due record they have and every
 // payment they've ever made, in one place, with a way to record a new
 // payment right from here instead of hunting for the right row in the table.
-function CustomerHistoryModal({ customer, onClose, onRecordPayment }) {
+function CustomerHistoryModal({ customer, onClose, onRecordPayment, onAddDue }) {
   const { data: duesRes, isLoading: duesLoading } = useGetDuesQuery(
     { customer: customer?._id, limit: 200 },
     { skip: !customer }
@@ -423,6 +598,16 @@ function CustomerHistoryModal({ customer, onClose, onRecordPayment }) {
   return (
     <Modal open={!!customer} onClose={onClose} title={customer.name} description={customer.email || undefined} size="lg">
       <div className="space-y-5">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => onAddDue(customer)}
+            className="inline-flex items-center gap-1 text-[12.5px] font-medium text-rose hover:underline"
+          >
+            <Plus size={13} /> Add due or credit
+          </button>
+        </div>
+
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-[6px] border border-border bg-bg-sunken px-3 py-2.5">
             <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">To collect</p>
@@ -518,6 +703,7 @@ export default function DueRecords() {
   const [statusFilter, setStatusFilter] = useState("Due");
   const [typeFilter, setTypeFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
+  const [addPresetCustomer, setAddPresetCustomer] = useState(null);
   const [activeDueId, setActiveDueId] = useState(null);
   const [editingDueId, setEditingDueId] = useState(null);
   const [deletingDueId, setDeletingDueId] = useState(null);
@@ -529,6 +715,14 @@ export default function DueRecords() {
   function recordPaymentFromHistory(due) {
     setHistoryCustomer(null);
     setActiveDueId(due._id);
+  }
+
+  // Same swap, but for adding a new due/credit for the customer already
+  // being viewed — no need to leave the history view and re-search for them.
+  function addDueFromHistory(customer) {
+    setHistoryCustomer(null);
+    setAddPresetCustomer(customer);
+    setAddOpen(true);
   }
 
   const rows = useMemo(
@@ -578,7 +772,12 @@ export default function DueRecords() {
         title="Due records"
         description={`${formatCurrency(totalReceivable)} to collect, ${formatCurrency(totalPayable)} to pay — across ${rows.filter((r) => r.remainingDue > 0).length} open records.`}
         action={
-          <Button onClick={() => setAddOpen(true)}>
+          <Button
+            onClick={() => {
+              setAddPresetCustomer(null);
+              setAddOpen(true);
+            }}
+          >
             <Plus size={16} /> Add due
           </Button>
         }
@@ -690,13 +889,22 @@ export default function DueRecords() {
         )}
       </Card>
 
-      <AddDueModal open={addOpen} onClose={() => setAddOpen(false)} />
+      <AddDueModal
+        key={addPresetCustomer?._id ?? "new"}
+        open={addOpen}
+        presetCustomer={addPresetCustomer}
+        onClose={() => {
+          setAddOpen(false);
+          setAddPresetCustomer(null);
+        }}
+      />
       <PaymentModal due={activeDue} onClose={() => setActiveDueId(null)} />
       <EditDueModal key={editingDueId} due={editingDue} onClose={() => setEditingDueId(null)} />
       <CustomerHistoryModal
         customer={historyCustomer}
         onClose={() => setHistoryCustomer(null)}
         onRecordPayment={recordPaymentFromHistory}
+        onAddDue={addDueFromHistory}
       />
 
       <ConfirmDialog
