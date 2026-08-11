@@ -29,6 +29,7 @@ const TYPE_TONE = {
   "Employee payment": "rose",
   "Broker payout": "rose",
   "Due collection": "neutral",
+  "Credit repayment": "trace",
 };
 
 const INVOICE_SECTIONS = [
@@ -133,6 +134,7 @@ export default function Reports() {
     employeePayments: 0,
     brokerPayments: 0,
     dueCollected: 0,
+    creditRepaid: 0,
     inventoryValue: 0,
   };
   const start = report?.range?.start;
@@ -394,6 +396,7 @@ export default function Reports() {
           { label: "Employee payments", value: formatCurrency(totals.employeePayments) },
           { label: "Broker commission paid", value: formatCurrency(totals.brokerPayments) },
           { label: "Due collected", value: formatCurrency(totals.dueCollected) },
+          { label: "Credit repaid", value: formatCurrency(totals.creditRepaid) },
         ].map((t) => (
           <Card key={t.label} className="px-4.5 py-3.5">
             <p className="font-mono text-[10.5px] uppercase tracking-wide text-text-faint">{t.label}</p>

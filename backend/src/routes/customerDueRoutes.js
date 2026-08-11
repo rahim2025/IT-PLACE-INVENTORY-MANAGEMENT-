@@ -13,6 +13,7 @@ router.post(
   authorize("owner"),
   [
     body("customer").isMongoId().withMessage("Choose a valid customer."),
+    body("type").optional().isIn(["due", "credit"]).withMessage("Type must be due or credit."),
     body("product").optional({ values: "falsy" }).isMongoId().withMessage("Choose a valid product."),
     body("dueAmount").isFloat({ min: 0.01 }).withMessage("Enter a due amount greater than zero."),
   ],
@@ -25,6 +26,7 @@ router.patch(
   authorize("owner"),
   [
     body("customer").optional().isMongoId().withMessage("Choose a valid customer."),
+    body("type").optional().isIn(["due", "credit"]).withMessage("Type must be due or credit."),
     body("product").optional({ values: "falsy" }).isMongoId().withMessage("Choose a valid product."),
     body("dueAmount").optional().isFloat({ min: 0.01 }).withMessage("Enter a due amount greater than zero."),
   ],

@@ -34,8 +34,14 @@ export const getReport = asyncHandler(async (req, res) => {
     // "Payment" only — mirrors getInvoice: a "Credit" just records an accrued
     // liability, no money has moved yet, so it shouldn't count as a cost here.
     BrokerTransaction.find({ date: range, type: "Payment" }).populate({ path: "broker", select: "name" }).lean(),
-    DuePayment.find({ date: range }).lean(),
+    DuePayment.find({ date: range }).populate({ path: "due", select: "type" }).lean(),
   ]);
+
+  // A payment against a "due" is money collected from a customer (revenue).
+  // A payment against a "credit" is the shop paying someone back (a cost) —
+  // these must never be lumped into the same "collected" figure.
+  const dueCollections = duePayments.filter((p) => p.due?.type !== "credit");
+  const creditRepayments = duePayments.filter((p) => p.due?.type === "credit");
 
   const ledger = [
     ...purchases.map((p) => ({
@@ -66,10 +72,17 @@ export const getReport = asyncHandler(async (req, res) => {
       amount: t.amount,
       date: t.date,
     })),
-    ...duePayments.map((p) => ({
+    ...dueCollections.map((p) => ({
       id: `duepay-${p._id}`,
       type: "Due collection",
       detail: p.notes || "Customer payment",
+      amount: p.amount,
+      date: p.date,
+    })),
+    ...creditRepayments.map((p) => ({
+      id: `creditpay-${p._id}`,
+      type: "Credit repayment",
+      detail: p.notes || "Repaid to customer/supplier",
       amount: p.amount,
       date: p.date,
     })),
@@ -91,7 +104,8 @@ export const getReport = asyncHandler(async (req, res) => {
         expenses: expenses.reduce((s, e) => s + e.amount, 0),
         employeePayments: employeeTx.reduce((s, t) => s + t.amount, 0),
         brokerPayments: brokerPayments.reduce((s, t) => s + t.amount, 0),
-        dueCollected: duePayments.reduce((s, p) => s + p.amount, 0),
+        dueCollected: dueCollections.reduce((s, p) => s + p.amount, 0),
+        creditRepaid: creditRepayments.reduce((s, p) => s + p.amount, 0),
         inventoryValue,
       },
     },

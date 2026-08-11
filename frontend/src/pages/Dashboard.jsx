@@ -37,7 +37,7 @@ export default function Dashboard() {
   if (dashboardLoading || !d) {
     return (
       <div>
-        <PageHeader title="Dashboard" description="Today's snapshot of stock, spend, and what customers still owe." />
+        <PageHeader title="Dashboard" description="Today's snapshot of stock, spend, money to collect, and money to pay." />
         <Skeleton className="h-24 w-full" />
         <div className="mt-5 grid gap-5 lg:grid-cols-3">
           <Skeleton className="h-64 lg:col-span-2" />
@@ -53,7 +53,8 @@ export default function Dashboard() {
     { label: "Inventory value", value: formatCurrency(d.inventoryValue) },
     { label: "Today's purchases", value: formatCurrency(d.todaysPurchases), tone: d.todaysPurchases > 0 ? "solder" : "neutral" },
     { label: "Today's expenses", value: formatCurrency(d.todaysExpenses), tone: d.todaysExpenses > 0 ? "trace" : "neutral" },
-    { label: "Outstanding dues", value: formatCurrency(d.totalOutstandingDues), tone: d.totalOutstandingDues > 0 ? "rose" : "neutral" },
+    { label: "To collect", value: formatCurrency(d.totalReceivable), tone: d.totalReceivable > 0 ? "rose" : "neutral" },
+    { label: "To pay", value: formatCurrency(d.totalPayable), tone: d.totalPayable > 0 ? "trace" : "neutral" },
     { label: "Employees", value: formatNumber(d.totalEmployees) },
     { label: "Low stock", value: formatNumber(d.lowStockCount), tone: d.lowStockCount ? "trace" : "solder", pulse: d.lowStockCount > 0 },
     { label: "Out of stock", value: formatNumber(d.outOfStockCount), tone: d.outOfStockCount ? "fault" : "solder", pulse: d.outOfStockCount > 0 },
@@ -63,7 +64,7 @@ export default function Dashboard() {
     <div>
       <PageHeader
         title="Dashboard"
-        description="Today's snapshot of stock, spend, and what customers still owe."
+        description="Today's snapshot of stock, spend, money to collect, and money to pay."
       />
 
       <StatusStrip segments={segments} />
@@ -142,19 +143,19 @@ export default function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader title="Customers with dues" action={<button onClick={() => navigate("/customers/dues")} className="text-[12.5px] font-medium text-rose hover:underline">View all</button>} />
+          <CardHeader title="Open due & credit balances" action={<button onClick={() => navigate("/customers/dues")} className="text-[12.5px] font-medium text-rose hover:underline">View all</button>} />
           {openDues.length === 0 ? (
             <EmptyState
               icon={HandCoins}
-              title="No outstanding dues"
-              description="Every customer credit balance is settled."
+              title="Nothing outstanding"
+              description="Every due and credit balance is settled."
             />
           ) : (
             <DataTable
               columns={[
                 { key: "customer", header: "Customer", render: (r) => r.customer?.name ?? "—" },
                 { key: "remainingDue", header: "Remaining", align: "right", mono: true, render: (r) => formatCurrency(r.remainingDue) },
-                { key: "status", header: "Status", render: (r) => <AssetTag tone="rose">{r.status}</AssetTag> },
+                { key: "type", header: "Type", render: (r) => <AssetTag tone={r.type === "credit" ? "trace" : "rose"}>{r.type === "credit" ? "To pay" : "To collect"}</AssetTag> },
               ]}
               rows={openDues}
               keyField="_id"

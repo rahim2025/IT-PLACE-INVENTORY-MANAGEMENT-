@@ -26,8 +26,14 @@ import {
 } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
 import { formatCurrency, formatDate } from "../lib/format";
+import { cn } from "../lib/cn";
 
 const STATUS_TONE = { Due: "rose", Paid: "solder" };
+// "due" = they owe the shop (receivable). "credit" = the shop owes them
+// (payable). Kept visually distinct from the status tones above so a row's
+// Type and Status badges never look identical.
+const TYPE_LABEL = { due: "Due", credit: "Credit" };
+const TYPE_TONE = { due: "neutral", credit: "trace" };
 
 function AddDueModal({ open, onClose }) {
   const dispatch = useDispatch();
@@ -39,6 +45,7 @@ function AddDueModal({ open, onClose }) {
   const customers = customersRes?.data ?? [];
   const products = productsRes?.data ?? [];
 
+  const [type, setType] = useState("due");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [productId, setProductId] = useState("");
@@ -48,6 +55,7 @@ function AddDueModal({ open, onClose }) {
   const [error, setError] = useState("");
 
   function reset() {
+    setType("due");
     setCustomerName("");
     setCustomerEmail("");
     setProductId("");
@@ -83,11 +91,19 @@ function AddDueModal({ open, onClose }) {
       const customerId = await resolveCustomerId();
       await createDue({
         customer: customerId,
+        type,
         product: productId || undefined,
         dueAmount: Number(dueAmount),
         notes: notes.trim(),
       }).unwrap();
-      dispatch(pushed({ message: `Due of ${formatCurrency(Number(dueAmount))} recorded for ${customerName.trim()}.` }));
+      dispatch(
+        pushed({
+          message:
+            type === "credit"
+              ? `Credit of ${formatCurrency(Number(dueAmount))} recorded — to pay ${customerName.trim()}.`
+              : `Due of ${formatCurrency(Number(dueAmount))} recorded for ${customerName.trim()}.`,
+        })
+      );
       reset();
       onClose();
     } catch (err) {
@@ -102,11 +118,37 @@ function AddDueModal({ open, onClose }) {
         reset();
         onClose();
       }}
-      title="Add customer due"
-      description="Type a new customer's name or match an existing one — no need to add them separately first."
+      title="Add due record"
+      description="Type a new customer or company name or match an existing one — no need to add them separately first."
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        <FieldGroup>
+          <Label>Type</Label>
+          <div className="inline-flex rounded-[6px] border border-border-strong bg-bg-sunken p-1">
+            <button
+              type="button"
+              onClick={() => setType("due")}
+              className={cn(
+                "rounded-[4px] px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+                type === "due" ? "bg-bg-elevated text-text shadow-sm" : "text-text-muted hover:text-text"
+              )}
+            >
+              Due — to collect
+            </button>
+            <button
+              type="button"
+              onClick={() => setType("credit")}
+              className={cn(
+                "rounded-[4px] px-3.5 py-1.5 text-[13px] font-medium transition-colors",
+                type === "credit" ? "bg-bg-elevated text-text shadow-sm" : "text-text-muted hover:text-text"
+              )}
+            >
+              Credit — to pay
+            </button>
+          </div>
+        </FieldGroup>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldGroup>
             <Label htmlFor="due-customer-name" hint="type to add new">Customer or Company name</Label>
@@ -148,7 +190,7 @@ function AddDueModal({ open, onClose }) {
         </FieldGroup>
 
         <FieldGroup>
-          <Label htmlFor="due-amount">Total due</Label>
+          <Label htmlFor="due-amount">{type === "credit" ? "Total amount to pay" : "Total due"}</Label>
           <Input
             id="due-amount"
             type="number"
@@ -184,6 +226,7 @@ function EditDueModal({ due, onClose }) {
 
   const products = productsRes?.data ?? [];
 
+  const [type, setType] = useState(due?.type ?? "due");
   const [productId, setProductId] = useState(due?.product?._id ?? "");
   const [dueAmount, setDueAmount] = useState(due?.dueAmount ?? "");
   const [notes, setNotes] = useState(due?.notes ?? "");
@@ -206,6 +249,7 @@ function EditDueModal({ due, onClose }) {
     try {
       await updateDue({
         id: due._id,
+        type,
         product: productId || undefined,
         dueAmount: Number(dueAmount),
         notes: notes.trim(),
@@ -221,6 +265,14 @@ function EditDueModal({ due, onClose }) {
     <Modal open={!!due} onClose={onClose} title={`Edit due — ${due.customer?.name}`} description="Paid amount isn't editable here — it follows recorded payments." size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <FieldGroup>
+          <Label htmlFor="edit-due-type">Type</Label>
+          <Select id="edit-due-type" value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="due">Due — to collect</option>
+            <option value="credit">Credit — to pay</option>
+          </Select>
+        </FieldGroup>
+
+        <FieldGroup>
           <Label htmlFor="edit-due-product" hint="optional">Product</Label>
           <Select id="edit-due-product" value={productId} onChange={(e) => setProductId(e.target.value)}>
             <option value="">No specific product</option>
@@ -231,7 +283,7 @@ function EditDueModal({ due, onClose }) {
         </FieldGroup>
 
         <FieldGroup>
-          <Label htmlFor="edit-due-amount">Total due</Label>
+          <Label htmlFor="edit-due-amount">{type === "credit" ? "Total amount to pay" : "Total due"}</Label>
           <Input
             id="edit-due-amount"
             type="number"
@@ -271,21 +323,29 @@ function PaymentModal({ due, onClose }) {
   if (!due) return null;
 
   const payments = paymentsRes?.data ?? [];
+  const value = Number(amount);
+  // Paying more than the remaining balance is no longer blocked — the extra
+  // gets carried forward into a brand-new, opposite-type record instead (see
+  // createDuePayment on the backend). This just previews that outcome.
+  const overflow = value > due.remainingDue ? Math.round((value - due.remainingDue) * 100) / 100 : 0;
+  const flippedType = due.type === "credit" ? "Due" : "Credit";
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const value = Number(amount);
     if (!value || value <= 0) {
       setError("Enter an amount greater than zero.");
       return;
     }
-    if (value > due.remainingDue) {
-      setError(`Amount exceeds the remaining balance of ${formatCurrency(due.remainingDue)}.`);
-      return;
-    }
     try {
-      await createPayment({ due: due._id, amount: value, notes: notes.trim() }).unwrap();
-      dispatch(pushed({ message: `Payment of ${formatCurrency(value)} recorded for ${due.customer?.name}.` }));
+      const result = await createPayment({ due: due._id, amount: value, notes: notes.trim() }).unwrap();
+      const created = result.data.overflowDue;
+      dispatch(
+        pushed({
+          message: created
+            ? `Payment of ${formatCurrency(value)} recorded. ${due.customer?.name} settled, and a new ${flippedType.toLowerCase()} of ${formatCurrency(created.dueAmount)} was opened for the extra.`
+            : `Payment of ${formatCurrency(value)} recorded for ${due.customer?.name}.`,
+        })
+      );
       setAmount("");
       setNotes("");
       setError("");
@@ -302,6 +362,12 @@ function PaymentModal({ due, onClose }) {
           <Label htmlFor="pay-amount">Amount</Label>
           <Input id="pay-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
           <FieldError>{error}</FieldError>
+          {overflow > 0 && (
+            <p className="mt-1.5 text-[12.5px] text-trace">
+              {formatCurrency(overflow)} more than the remaining balance — this due will be settled, and a new{" "}
+              {flippedType.toLowerCase()} of {formatCurrency(overflow)} will be opened for {due.customer?.name}.
+            </p>
+          )}
         </FieldGroup>
         <FieldGroup>
           <Label htmlFor="pay-notes" hint="optional">Notes</Label>
@@ -348,36 +414,38 @@ function CustomerHistoryModal({ customer, onClose, onRecordPayment }) {
 
   const dues = duesRes?.data ?? [];
   const payments = paymentsRes?.data ?? [];
-  const totalDue = dues.reduce((s, d) => s + d.dueAmount, 0);
-  const totalPaid = dues.reduce((s, d) => s + d.paidAmount, 0);
-  const totalRemaining = dues.reduce((s, d) => s + d.remainingDue, 0);
+  const dueRows = dues.filter((d) => d.type !== "credit");
+  const creditRows = dues.filter((d) => d.type === "credit");
+  const totalDue = dueRows.reduce((s, d) => s + d.remainingDue, 0);
+  const totalCredit = creditRows.reduce((s, d) => s + d.remainingDue, 0);
+  const net = totalDue - totalCredit;
 
   return (
     <Modal open={!!customer} onClose={onClose} title={customer.name} description={customer.email || undefined} size="lg">
       <div className="space-y-5">
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-[6px] border border-border bg-bg-sunken px-3 py-2.5">
-            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Total due</p>
+            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">To collect</p>
             <p className="mt-1 font-mono text-[15px] font-semibold text-text">{formatCurrency(totalDue)}</p>
           </div>
           <div className="rounded-[6px] border border-border bg-bg-sunken px-3 py-2.5">
-            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Total paid</p>
-            <p className="mt-1 font-mono text-[15px] font-semibold text-solder">{formatCurrency(totalPaid)}</p>
+            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">To pay</p>
+            <p className="mt-1 font-mono text-[15px] font-semibold text-text">{formatCurrency(totalCredit)}</p>
           </div>
           <div className="rounded-[6px] border border-border bg-bg-sunken px-3 py-2.5">
-            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Outstanding</p>
-            <p className={`mt-1 font-mono text-[15px] font-semibold ${totalRemaining > 0 ? "text-rose" : "text-solder"}`}>
-              {formatCurrency(totalRemaining)}
+            <p className="font-mono text-[10px] uppercase tracking-wide text-text-faint">Net {net >= 0 ? "(to collect)" : "(to pay)"}</p>
+            <p className={`mt-1 font-mono text-[15px] font-semibold ${net > 0 ? "text-rose" : net < 0 ? "text-trace" : "text-solder"}`}>
+              {formatCurrency(Math.abs(net))}
             </p>
           </div>
         </div>
 
         <div>
-          <p className="mb-2 font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Due records</p>
+          <p className="mb-2 font-mono text-[10.5px] uppercase tracking-wide text-text-faint">Due &amp; credit records</p>
           {duesLoading ? (
             <SkeletonRows rows={2} cols={4} />
           ) : dues.length === 0 ? (
-            <p className="text-[13px] text-text-muted">No due records for this customer yet.</p>
+            <p className="text-[13px] text-text-muted">No due or credit records for this customer yet.</p>
           ) : (
             <ul className="divide-y divide-border rounded-[6px] border border-border">
               {dues.map((d) => (
@@ -385,10 +453,11 @@ function CustomerHistoryModal({ customer, onClose, onRecordPayment }) {
                   <div className="min-w-0">
                     <p className="truncate text-[13px] text-text">{d.product?.name ?? "General due"}</p>
                     <p className="text-[11.5px] text-text-faint">
-                      {formatDate(d.date)} · {formatCurrency(d.dueAmount)} due
+                      {formatDate(d.date)} · {formatCurrency(d.dueAmount)}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2.5">
+                    <AssetTag tone={TYPE_TONE[d.type]}>{TYPE_LABEL[d.type]}</AssetTag>
                     <AssetTag tone={STATUS_TONE[d.status]}>{d.status}</AssetTag>
                     {d.remainingDue > 0 && (
                       <button
@@ -447,6 +516,7 @@ export default function DueRecords() {
 
   const [customerFilter, setCustomerFilter] = useState(searchParams.get("customer") ?? "all");
   const [statusFilter, setStatusFilter] = useState("Due");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
   const [activeDueId, setActiveDueId] = useState(null);
   const [editingDueId, setEditingDueId] = useState(null);
@@ -474,15 +544,21 @@ export default function DueRecords() {
   );
 
   const filtered = rows.filter(
-    (d) => (customerFilter === "all" || d.customer?._id === customerFilter) && (statusFilter === "all" || d.status === statusFilter)
+    (d) =>
+      (customerFilter === "all" || d.customer?._id === customerFilter) &&
+      (statusFilter === "all" || d.status === statusFilter) &&
+      (typeFilter === "all" || d.type === typeFilter)
   );
 
   const activeDue = rows.find((d) => d._id === activeDueId);
   const editingDue = rows.find((d) => d._id === editingDueId);
   const deletingDue = rows.find((d) => d._id === deletingDueId);
-  const totalDue = rows.reduce((s, d) => s + d.dueAmount, 0);
-  const totalPaid = rows.reduce((s, d) => s + d.paidAmount, 0);
-  const totalOutstanding = rows.reduce((s, d) => s + d.remainingDue, 0);
+  // Due and credit balances are never summed together — they're opposite
+  // directions of money, so "outstanding" is reported per direction plus a
+  // net figure, not one blended total.
+  const totalReceivable = rows.filter((d) => d.type !== "credit").reduce((s, d) => s + d.remainingDue, 0);
+  const totalPayable = rows.filter((d) => d.type === "credit").reduce((s, d) => s + d.remainingDue, 0);
+  const netOutstanding = totalReceivable - totalPayable;
 
   async function handleDelete() {
     if (!deletingDue) return;
@@ -500,7 +576,7 @@ export default function DueRecords() {
     <div>
       <PageHeader
         title="Due records"
-        description={`${formatCurrency(totalOutstanding)} outstanding across ${rows.filter((r) => r.remainingDue > 0).length} open dues.`}
+        description={`${formatCurrency(totalReceivable)} to collect, ${formatCurrency(totalPayable)} to pay — across ${rows.filter((r) => r.remainingDue > 0).length} open records.`}
         action={
           <Button onClick={() => setAddOpen(true)}>
             <Plus size={16} /> Add due
@@ -512,16 +588,20 @@ export default function DueRecords() {
         <StatusStrip
           segments={[
             { label: "Total records", value: rows.length },
-            { label: "Total due", value: formatCurrency(totalDue) },
-            { label: "Total paid", value: formatCurrency(totalPaid) },
-            { label: "Total outstanding", value: formatCurrency(totalOutstanding), tone: totalOutstanding > 0 ? "rose" : "solder" },
+            { label: "To collect", value: formatCurrency(totalReceivable), tone: totalReceivable > 0 ? "rose" : "solder" },
+            { label: "To pay", value: formatCurrency(totalPayable), tone: totalPayable > 0 ? "trace" : "solder" },
+            {
+              label: netOutstanding >= 0 ? "Net (to collect)" : "Net (to pay)",
+              value: formatCurrency(Math.abs(netOutstanding)),
+              tone: netOutstanding > 0 ? "rose" : netOutstanding < 0 ? "trace" : "solder",
+            },
           ]}
         />
       </div>
 
       <Card>
         {isLoading ? (
-          <SkeletonRows rows={7} cols={6} />
+          <SkeletonRows rows={7} cols={7} />
         ) : (
           <DataTable
             searchKeys={["customerName"]}
@@ -534,10 +614,15 @@ export default function DueRecords() {
                     <option key={c._id} value={c._id}>{c.name}</option>
                   ))}
                 </Select>
+                <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                  <option value="all">Due &amp; credit</option>
+                  <option value="due">Due only</option>
+                  <option value="credit">Credit only</option>
+                </Select>
                 <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
                   <option value="all">All statuses</option>
-                  <option value="Due">Due</option>
-                  <option value="Paid">Paid</option>
+                  <option value="Due">Outstanding</option>
+                  <option value="Paid">Settled</option>
                 </Select>
               </>
             }
@@ -559,11 +644,12 @@ export default function DueRecords() {
                     "—"
                   ),
               },
+              { key: "type", header: "Type", render: (r) => <AssetTag tone={TYPE_TONE[r.type]}>{TYPE_LABEL[r.type]}</AssetTag> },
               { key: "productLabel", header: "Product", render: (r) => <span className="text-[12.5px] text-text-muted">{r.productLabel || "—"}</span> },
-              { key: "dueAmount", header: "Due", align: "right", mono: true, render: (r) => formatCurrency(r.dueAmount) },
-              { key: "paidAmount", header: "Paid", align: "right", mono: true, render: (r) => formatCurrency(r.paidAmount) },
+              { key: "dueAmount", header: "Amount", align: "right", mono: true, render: (r) => formatCurrency(r.dueAmount) },
+              { key: "paidAmount", header: "Settled", align: "right", mono: true, render: (r) => formatCurrency(r.paidAmount) },
               { key: "remainingDue", header: "Remaining", align: "right", mono: true, render: (r) => formatCurrency(r.remainingDue) },
-              { key: "status", header: "Status", render: (r) => <AssetTag tone={STATUS_TONE[r.status]}>{r.status}</AssetTag> },
+              { key: "status", header: "Status", render: (r) => <AssetTag tone={STATUS_TONE[r.status]}>{r.status === "Due" ? "Outstanding" : "Settled"}</AssetTag> },
               { key: "date", header: "Date", render: (r) => formatDate(r.date) },
               {
                 key: "actions",

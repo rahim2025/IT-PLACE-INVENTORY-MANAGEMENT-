@@ -27,7 +27,7 @@ export const getDashboard = asyncHandler(async (req, res) => {
     Product.find().select("currentStock wholesalePrice").lean(),
     Purchase.find().select("date quantity unitPrice").lean(),
     Expense.find().select("date amount").lean(),
-    CustomerDue.find().select("remainingDue").lean(),
+    CustomerDue.find().select("remainingDue type").lean(),
     Employee.countDocuments(),
     Purchase.find({ date: { $gte: todayStart, $lte: todayEnd } }).select("quantity unitPrice").lean(),
     Expense.find({ date: { $gte: todayStart, $lte: todayEnd } }).select("amount").lean(),
@@ -37,7 +37,11 @@ export const getDashboard = asyncHandler(async (req, res) => {
   const inventoryValue = products.reduce((s, p) => s + p.currentStock * (p.wholesalePrice || 0), 0);
   const lowStockCount = products.filter((p) => p.currentStock > 0 && p.currentStock <= settings.lowStockThreshold).length;
   const outOfStockCount = products.filter((p) => p.currentStock <= 0).length;
-  const totalOutstandingDues = dues.reduce((s, d) => s + d.remainingDue, 0);
+  // Receivable (customers owe the shop) and payable (the shop owes someone)
+  // are kept separate — netting them into one number would hide real money
+  // the shop still needs to collect or pay out.
+  const totalReceivable = dues.filter((d) => d.type !== "credit").reduce((s, d) => s + d.remainingDue, 0);
+  const totalPayable = dues.filter((d) => d.type === "credit").reduce((s, d) => s + d.remainingDue, 0);
 
   res.json({
     success: true,
@@ -47,7 +51,8 @@ export const getDashboard = asyncHandler(async (req, res) => {
       inventoryValue,
       todaysPurchases: todaysPurchases.reduce((s, p) => s + p.quantity * p.unitPrice, 0),
       todaysExpenses: todaysExpenses.reduce((s, e) => s + e.amount, 0),
-      totalOutstandingDues,
+      totalReceivable,
+      totalPayable,
       totalEmployees,
       lowStockCount,
       outOfStockCount,

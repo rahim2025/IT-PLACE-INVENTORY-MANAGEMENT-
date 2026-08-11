@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "migrate:shop": "node src/scripts/migrateProductShop.js"
+    "migrate:shop": "node src/scripts/migrateProductShop.js",
+    "migrate:due-type": "node src/scripts/migrateCustomerDueType.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -3,6 +3,12 @@ import mongoose from "mongoose";
 const customerDueSchema = new mongoose.Schema(
   {
     customer: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true },
+    // "due" = this person/company owes the shop (receivable, the original
+    // behavior). "credit" = the shop owes them instead (payable — e.g. the
+    // shop borrowed money from them). Same paidAmount/remainingDue/status
+    // machinery works for both directions; only the meaning of "owes"
+    // flips depending on this field.
+    type: { type: String, enum: ["due", "credit"], default: "due" },
     // Optional — a due doesn't have to be tied to a specific catalog product.
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
     // Typed directly by staff at due-creation time, not derived from line items.
