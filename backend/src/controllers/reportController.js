@@ -149,13 +149,26 @@ export const getInvoice = asyncHandler(async (req, res) => {
   // so they're never filtered here even when a specific shop is requested.
   const saleFilter = shop ? { date: range, shop } : { date: range };
 
-  const [settings, sales, employeeTx, brokerPayments, expenses] = await Promise.all([
+  const [settings, sales, employeeTx, brokerPayments, expenses, duePayments] = await Promise.all([
     Settings.getSingleton(),
     Sale.find(saleFilter).populate({ path: "items.product", select: "name" }).lean(),
     EmployeeTransaction.find({ date: range }).populate({ path: "employee", select: "name" }).lean(),
     BrokerTransaction.find({ date: range, type: "Payment" }).populate({ path: "broker", select: "name" }).lean(),
     Expense.find({ date: range }).lean(),
+    DuePayment.find({ date: range })
+      .populate({ path: "due", select: "type customer", populate: { path: "customer", select: "name" } })
+      .lean(),
   ]);
+
+  // Same due/credit split as getReport: a payment against a "due" is money
+  // collected from a customer (revenue); a payment against a "credit" is the
+  // shop paying someone back (a cost) — never the same bucket.
+  const dueCollectionItems = duePayments
+    .filter((p) => p.due?.type !== "credit")
+    .map((p) => ({ date: p.date, customer: p.due?.customer?.name ?? "Unknown customer", amount: p.amount, notes: p.notes || "" }));
+  const creditRepaymentItems = duePayments
+    .filter((p) => p.due?.type === "credit")
+    .map((p) => ({ date: p.date, customer: p.due?.customer?.name ?? "Unknown customer", amount: p.amount, notes: p.notes || "" }));
 
   const saleItems = sales.flatMap((s) =>
     s.items.map((it) => ({
@@ -212,6 +225,16 @@ export const getInvoice = asyncHandler(async (req, res) => {
         count: expenseItems.length,
         total: expenseItems.reduce((s, i) => s + i.amount, 0),
         items: expenseItems,
+      },
+      dueCollections: {
+        count: dueCollectionItems.length,
+        total: dueCollectionItems.reduce((s, i) => s + i.amount, 0),
+        items: dueCollectionItems,
+      },
+      creditRepayments: {
+        count: creditRepaymentItems.length,
+        total: creditRepaymentItems.reduce((s, i) => s + i.amount, 0),
+        items: creditRepaymentItems,
       },
     },
   });

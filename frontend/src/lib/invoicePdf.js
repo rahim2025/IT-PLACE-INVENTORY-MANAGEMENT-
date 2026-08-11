@@ -86,6 +86,16 @@ export function downloadInvoicePdf(invoice, sections, totals) {
     });
   }
 
+  if (sections.dueCollections) {
+    y = renderSection(doc, y, {
+      title: "Due collected",
+      countLabel: `${invoice.dueCollections.count} payment${invoice.dueCollections.count === 1 ? "" : "s"}`,
+      total: invoice.dueCollections.total,
+      head: ["Date", "Customer", "Notes", "Amount"],
+      body: invoice.dueCollections.items.map((i) => [formatDate(i.date), i.customer, i.notes || "—", formatCurrency(i.amount)]),
+    });
+  }
+
   if (sections.employeeCost) {
     y = renderSection(doc, y, {
       title: "Employee cost",
@@ -113,6 +123,16 @@ export function downloadInvoicePdf(invoice, sections, totals) {
       total: invoice.expenses.total,
       head: ["Date", "Category", "Description", "Amount"],
       body: invoice.expenses.items.map((i) => [formatDate(i.date), i.category, i.description, formatCurrency(i.amount)]),
+    });
+  }
+
+  if (sections.creditRepayments) {
+    y = renderSection(doc, y, {
+      title: "Credit repaid",
+      countLabel: `${invoice.creditRepayments.count} payment${invoice.creditRepayments.count === 1 ? "" : "s"}`,
+      total: invoice.creditRepayments.total,
+      head: ["Date", "Customer", "Notes", "Amount"],
+      body: invoice.creditRepayments.items.map((i) => [formatDate(i.date), i.customer, i.notes || "—", formatCurrency(i.amount)]),
     });
   }
 

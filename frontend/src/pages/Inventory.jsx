@@ -8,6 +8,7 @@ import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import AssetTag from "../components/ui/AssetTag";
 import DataTable from "../components/ui/DataTable";
+import ProductPicker from "../components/ui/ProductPicker";
 import { SkeletonRows } from "../components/ui/Skeleton";
 import { useGetProductsQuery, useGetStockOverviewQuery, useCreateAdjustmentMutation } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
@@ -150,12 +151,12 @@ export default function Inventory() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <FieldGroup>
             <Label htmlFor="adj-product">Product</Label>
-            <Select id="adj-product" value={productId} onChange={(e) => setProductId(e.target.value)}>
-              <option value="">Select a product</option>
-              {products.map((p) => (
-                <option key={p._id} value={p._id}>{p.name} ({p.shop})</option>
-              ))}
-            </Select>
+            <ProductPicker
+              products={products}
+              value={productId}
+              onChange={setProductId}
+              placeholder="Search products…"
+            />
             <FieldError>{errors.productId}</FieldError>
           </FieldGroup>
           <FieldGroup>

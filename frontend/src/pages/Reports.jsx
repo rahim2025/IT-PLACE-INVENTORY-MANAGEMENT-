@@ -34,9 +34,11 @@ const TYPE_TONE = {
 
 const INVOICE_SECTIONS = [
   { key: "sales", label: "Sales" },
+  { key: "dueCollections", label: "Due collected" },
   { key: "employeeCost", label: "Employee cost" },
   { key: "brokerCost", label: "Broker cost" },
   { key: "expenses", label: "Expenses" },
+  { key: "creditRepayments", label: "Credit repaid" },
 ];
 
 const INVOICE_MODES = [
@@ -108,15 +110,23 @@ function toInvoiceCSV(invoice, sections) {
   if (sections.expenses) {
     invoice.expenses.items.forEach((i) => lines.push(["Expenses", formatDate(i.date), `"${i.category} — ${i.description}"`, i.amount].join(",")));
   }
+  if (sections.dueCollections) {
+    invoice.dueCollections.items.forEach((i) => lines.push(["Due collected", formatDate(i.date), `"${i.customer}${i.notes ? ` — ${i.notes}` : ""}"`, i.amount].join(",")));
+  }
+  if (sections.creditRepayments) {
+    invoice.creditRepayments.items.forEach((i) => lines.push(["Credit repaid", formatDate(i.date), `"${i.customer}${i.notes ? ` — ${i.notes}` : ""}"`, i.amount].join(",")));
+  }
   return [header.join(","), ...lines].join("\n");
 }
 
 function computeInvoiceTotals(invoiceData, sections) {
-  const revenue = sections.sales ? invoiceData?.sales.total ?? 0 : 0;
+  const revenue =
+    (sections.sales ? invoiceData?.sales.total ?? 0 : 0) + (sections.dueCollections ? invoiceData?.dueCollections.total ?? 0 : 0);
   const cost =
     (sections.employeeCost ? invoiceData?.employeeCost.total ?? 0 : 0) +
     (sections.brokerCost ? invoiceData?.brokerCost.total ?? 0 : 0) +
-    (sections.expenses ? invoiceData?.expenses.total ?? 0 : 0);
+    (sections.expenses ? invoiceData?.expenses.total ?? 0 : 0) +
+    (sections.creditRepayments ? invoiceData?.creditRepayments.total ?? 0 : 0);
   return { revenue, cost, net: revenue - cost };
 }
 
@@ -140,7 +150,14 @@ export default function Reports() {
   const start = report?.range?.start;
   const end = report?.range?.end;
 
-  const [sections, setSections] = useState({ sales: true, employeeCost: true, brokerCost: true, expenses: true });
+  const [sections, setSections] = useState({
+    sales: true,
+    dueCollections: true,
+    employeeCost: true,
+    brokerCost: true,
+    expenses: true,
+    creditRepayments: true,
+  });
   const [invoiceMode, setInvoiceMode] = useState("today");
   const [specificDate, setSpecificDate] = useState(today());
   const [invoiceShop, setInvoiceShop] = useState("all");
@@ -273,7 +290,7 @@ export default function Reports() {
               ))}
             </Select>
             <p className="mt-1.5 text-[12px] text-text-faint">
-              Only the Sales section is shop-specific — costs (payroll, broker, expenses) apply to the whole business.
+              Only the Sales section is shop-specific — everything else (payroll, broker, expenses, due collected, credit repaid) applies to the whole business.
             </p>
           </div>
 
@@ -322,6 +339,16 @@ export default function Reports() {
                 rows={invoice.sales.items.map((i) => [formatDate(i.date), i.product, i.quantity, formatCurrency(i.unitPrice), formatCurrency(i.lineTotal)])}
               />
             )}
+            {sections.dueCollections && (
+              <InvoiceSection
+                title="Due collected"
+                countLabel={`${invoice.dueCollections.count} payment${invoice.dueCollections.count === 1 ? "" : "s"}`}
+                total={invoice.dueCollections.total}
+                tone="solder"
+                columns={["Date", "Customer", "Notes", "Amount"]}
+                rows={invoice.dueCollections.items.map((i) => [formatDate(i.date), i.customer, i.notes || "—", formatCurrency(i.amount)])}
+              />
+            )}
             {sections.employeeCost && (
               <InvoiceSection
                 title="Employee cost"
@@ -350,6 +377,16 @@ export default function Reports() {
                 tone="rose"
                 columns={["Date", "Category", "Description", "Amount"]}
                 rows={invoice.expenses.items.map((i) => [formatDate(i.date), i.category, i.description, formatCurrency(i.amount)])}
+              />
+            )}
+            {sections.creditRepayments && (
+              <InvoiceSection
+                title="Credit repaid"
+                countLabel={`${invoice.creditRepayments.count} payment${invoice.creditRepayments.count === 1 ? "" : "s"}`}
+                total={invoice.creditRepayments.total}
+                tone="rose"
+                columns={["Date", "Customer", "Notes", "Amount"]}
+                rows={invoice.creditRepayments.items.map((i) => [formatDate(i.date), i.customer, i.notes || "—", formatCurrency(i.amount)])}
               />
             )}
 
