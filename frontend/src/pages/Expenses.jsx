@@ -7,6 +7,7 @@ import { Card, CardHeader, CardBody } from "../components/ui/Card";
 import { Select, Input, Textarea, Label, FieldGroup, FieldError } from "../components/ui/Field";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
+import AssetTag from "../components/ui/AssetTag";
 import DataTable from "../components/ui/DataTable";
 import EmptyState from "../components/ui/EmptyState";
 import { SkeletonRows } from "../components/ui/Skeleton";
@@ -15,6 +16,7 @@ import { selectThemeMode } from "../features/theme/themeSlice";
 import { pushed } from "../features/toast/toastSlice";
 import { formatCurrency, formatDate, toLocalDateInput } from "../lib/format";
 import { CHART_COLORS, CHART_GRID_LIGHT, CHART_GRID_DARK } from "../lib/colors";
+import { SHOPS, SHOP_TONE } from "../lib/shops";
 
 const today = () => toLocalDateInput();
 
@@ -30,9 +32,11 @@ export default function Expenses() {
   const employees = employeesRes?.data ?? [];
 
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [shopFilter, setShopFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [category, setCategory] = useState("");
+  const [shop, setShop] = useState("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today());
   const [description, setDescription] = useState("");
@@ -61,7 +65,9 @@ export default function Expenses() {
     return categories.map((c) => ({ label: c, value: totals[c] }));
   }, [monthFiltered, categories]);
 
-  const filtered = categoryFilter === "all" ? monthFiltered : monthFiltered.filter((e) => e.category === categoryFilter);
+  const filtered = monthFiltered.filter(
+    (e) => (categoryFilter === "all" || e.category === categoryFilter) && (shopFilter === "all" || e.shop === shopFilter)
+  );
   const grid = mode === "dark" ? CHART_GRID_DARK : CHART_GRID_LIGHT;
   const tickColor = mode === "dark" ? "#9aa2a4" : "#5b6266";
 
@@ -81,6 +87,7 @@ export default function Expenses() {
     try {
       await createExpense({
         category: category.trim(),
+        shop: shop || undefined,
         amount: Number(amount),
         date,
         description: description.trim(),
@@ -89,6 +96,7 @@ export default function Expenses() {
       dispatch(pushed({ message: `${category} expense of ${formatCurrency(Number(amount))} recorded.` }));
       setModalOpen(false);
       setCategory("");
+      setShop("");
       setAmount("");
       setDescription("");
       setEmployeeId("");
@@ -137,7 +145,7 @@ export default function Expenses() {
 
       <Card>
         {isLoading ? (
-          <SkeletonRows rows={7} cols={5} />
+          <SkeletonRows rows={7} cols={6} />
         ) : (
           <DataTable
             searchKeys={["description"]}
@@ -148,6 +156,12 @@ export default function Expenses() {
                   <option value="all">All categories</option>
                   {categories.map((c) => (
                     <option key={c} value={c}>{c}</option>
+                  ))}
+                </Select>
+                <Select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="!h-8.5 w-36 !text-[13px]">
+                  <option value="all">All shops</option>
+                  {SHOPS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
                   ))}
                 </Select>
                 <Input
@@ -169,6 +183,7 @@ export default function Expenses() {
             }
             columns={[
               { key: "category", header: "Category" },
+              { key: "shop", header: "Shop", render: (r) => (r.shop ? <AssetTag tone={SHOP_TONE[r.shop]}>{r.shop}</AssetTag> : <span className="text-text-faint">Company-wide</span>) },
               { key: "description", header: "Description" },
               { key: "employee", header: "Employee", render: (r) => r.employee?.name ?? "—" },
               { key: "amount", header: "Amount", align: "right", mono: true, render: (r) => formatCurrency(r.amount) },
@@ -193,6 +208,15 @@ export default function Expenses() {
               ))}
             </datalist>
             <FieldError>{errors.category}</FieldError>
+          </FieldGroup>
+          <FieldGroup>
+            <Label htmlFor="exp-shop" hint="optional — leave blank if it's a whole-business cost">Shop</Label>
+            <Select id="exp-shop" value={shop} onChange={(e) => setShop(e.target.value)}>
+              <option value="">Company-wide</option>
+              {SHOPS.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
           </FieldGroup>
           <FieldGroup>
             <Label htmlFor="exp-amount">Amount</Label>

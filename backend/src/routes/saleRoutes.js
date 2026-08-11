@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import { listSales, createSale } from "../controllers/saleController.js";
 import { protect, authorize } from "../middleware/auth.js";
 import { validate } from "../middleware/validate.js";
+import { SHOPS } from "../constants/shops.js";
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.post(
   protect,
   authorize("owner", "employee"),
   [
-    body("shop").isIn(["Shop 1", "Shop 2"]).withMessage("Choose Shop 1 or Shop 2."),
+    body("shop").isIn(SHOPS).withMessage(`Choose one of: ${SHOPS.join(", ")}.`),
     body("items").isArray({ min: 1 }).withMessage("Add at least one product."),
     body("items.*.product").isMongoId().withMessage("Choose a valid product for each item."),
     body("items.*.quantity").isInt({ min: 1 }).withMessage("Quantity must be at least 1."),

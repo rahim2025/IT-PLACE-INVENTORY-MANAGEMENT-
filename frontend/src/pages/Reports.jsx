@@ -14,6 +14,7 @@ import { pushed } from "../features/toast/toastSlice";
 import { formatCurrency, formatDate, toLocalDateInput } from "../lib/format";
 import { downloadInvoicePdf } from "../lib/invoicePdf";
 import { cn } from "../lib/cn";
+import { SHOPS } from "../lib/shops";
 
 const PERIODS = [
   { key: "daily", label: "Daily" },
@@ -263,10 +264,11 @@ export default function Reports() {
 
           <div>
             <p className="mb-2 text-[13px] font-medium text-text-muted">Shop</p>
-            <Select value={invoiceShop} onChange={(e) => setInvoiceShop(e.target.value)} className="!h-9 w-44">
+            <Select value={invoiceShop} onChange={(e) => setInvoiceShop(e.target.value)} className="!h-9 w-48">
               <option value="all">All shops (sales combined)</option>
-              <option value="Shop 1">Shop 1 only</option>
-              <option value="Shop 2">Shop 2 only</option>
+              {SHOPS.map((s) => (
+                <option key={s} value={s}>{s} only</option>
+              ))}
             </Select>
             <p className="mt-1.5 text-[12px] text-text-faint">
               Only the Sales section is shop-specific — costs (payroll, broker, expenses) apply to the whole business.

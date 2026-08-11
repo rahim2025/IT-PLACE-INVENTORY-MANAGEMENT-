@@ -12,10 +12,10 @@ import { SkeletonRows } from "../components/ui/Skeleton";
 import { useGetProductsQuery, useGetStockOverviewQuery, useCreateAdjustmentMutation } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
 import { formatCurrency, formatNumber } from "../lib/format";
+import { SHOPS, SHOP_TONE } from "../lib/shops";
 
 const STOCK_TONE = { ok: "solder", low: "trace", out: "fault" };
 const STOCK_LABEL = { ok: "Healthy", low: "Low stock", out: "Out of stock" };
-const SHOP_TONE = { "Shop 1": "neutral", "Shop 2": "rose" };
 
 function StatTile({ label, value, tone }) {
   return (
@@ -113,10 +113,11 @@ export default function Inventory() {
                   <option value="low">Low stock</option>
                   <option value="out">Out of stock</option>
                 </Select>
-                <Select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                <Select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="!h-8.5 w-36 !text-[13px]">
                   <option value="all">All shops</option>
-                  <option value="Shop 1">Shop 1</option>
-                  <option value="Shop 2">Shop 2</option>
+                  {SHOPS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </Select>
               </>
             }

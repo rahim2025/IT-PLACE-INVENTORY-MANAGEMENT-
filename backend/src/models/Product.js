@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
+import { SHOPS } from "../constants/shops.js";
 
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     brand: { type: mongoose.Schema.Types.ObjectId, ref: "Brand", required: true },
     category: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
-    // Every product belongs to exactly one physical shop location.
-    shop: { type: String, enum: ["Shop 1", "Shop 2"], required: true },
+    // Every product belongs to exactly one physical shop/warehouse location.
+    shop: { type: String, enum: SHOPS, required: true },
     barcode: { type: String, trim: true, unique: true, sparse: true },
     description: { type: String, trim: true },
     // Free text so the shop can quote a range (e.g. "15000-16000") instead of one number.

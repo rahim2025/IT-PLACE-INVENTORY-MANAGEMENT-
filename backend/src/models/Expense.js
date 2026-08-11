@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { SHOPS } from "../constants/shops.js";
 
 export const EXPENSE_CATEGORIES = [
   "Rent",
@@ -16,6 +17,10 @@ const expenseSchema = new mongoose.Schema(
     // just by typing it on the Add expense form. EXPENSE_CATEGORIES above is
     // only a starting suggestion list, not an enforced set.
     category: { type: String, required: true, trim: true },
+    // Optional — unlike Product/Sale, an expense isn't always tied to one
+    // location (e.g. a business-wide software subscription). Left unset
+    // means "company-wide".
+    shop: { type: String, enum: SHOPS },
     amount: { type: Number, required: true, min: 0.01 },
     date: { type: Date, required: true, default: Date.now },
     description: { type: String, required: true, trim: true },

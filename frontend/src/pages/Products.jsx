@@ -25,10 +25,10 @@ import {
 } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
 import { formatCurrency } from "../lib/format";
+import { SHOPS, SHOP_TONE } from "../lib/shops";
 
 const STOCK_TONE = { ok: "solder", low: "trace", out: "fault" };
 const STOCK_LABEL = { ok: "In stock", low: "Low stock", out: "Out of stock" };
-const SHOP_TONE = { "Shop 1": "neutral", "Shop 2": "rose" };
 
 function getStockStatus(stock, threshold) {
   if (stock <= 0) return "out";
@@ -46,7 +46,7 @@ function EditProductModal({ product, categories, brands, onClose }) {
     name: product?.name ?? "",
     brand: product?.brand?.name ?? "",
     category: product?.category?.name ?? "",
-    shop: product?.shop ?? "Shop 1",
+    shop: product?.shop ?? SHOPS[0],
     sellingPrice: product?.sellingPrice ?? "",
     wholesalePrice: product?.wholesalePrice ?? "",
   }));
@@ -143,8 +143,9 @@ function EditProductModal({ product, categories, brands, onClose }) {
         <FieldGroup>
           <Label htmlFor="edit-shop">Shop</Label>
           <Select id="edit-shop" value={form.shop} onChange={(e) => update("shop", e.target.value)}>
-            <option value="Shop 1">Shop 1</option>
-            <option value="Shop 2">Shop 2</option>
+            {SHOPS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </Select>
         </FieldGroup>
 
@@ -275,10 +276,11 @@ export default function Products() {
                     </option>
                   ))}
                 </Select>
-                <Select value={shop} onChange={(e) => setShop(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                <Select value={shop} onChange={(e) => setShop(e.target.value)} className="!h-8.5 w-36 !text-[13px]">
                   <option value="all">All shops</option>
-                  <option value="Shop 1">Shop 1</option>
-                  <option value="Shop 2">Shop 2</option>
+                  {SHOPS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </Select>
               </>
             }

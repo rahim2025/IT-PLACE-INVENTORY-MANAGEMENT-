@@ -14,19 +14,20 @@ import {
   useCreateBrandMutation,
 } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
+import { SHOPS } from "../lib/shops";
 
 const emptyRow = () => ({
   key: crypto.randomUUID(),
   name: "",
   brand: "",
   category: "",
-  shop: "Shop 1",
+  shop: SHOPS[0],
   quantity: "",
   wholesalePrice: "",
   sellingPrice: "",
 });
 
-const ROW_GRID = "grid grid-cols-[minmax(180px,2fr)_minmax(130px,1.1fr)_minmax(130px,1.1fr)_100px_84px_112px_140px_32px] gap-2";
+const ROW_GRID = "grid grid-cols-[minmax(180px,2fr)_minmax(130px,1.1fr)_minmax(130px,1.1fr)_128px_84px_112px_140px_32px] gap-2";
 
 function validateRow(row) {
   const errors = [];
@@ -154,7 +155,7 @@ export default function AddProduct() {
         <CardBody>
           <form onSubmit={handleSubmit}>
             <div className="overflow-x-auto">
-              <div className="min-w-[1000px]">
+              <div className="min-w-[1040px]">
                 <div className={ROW_GRID}>
                   <Label>Product name</Label>
                   <Label>Brand</Label>
@@ -196,8 +197,9 @@ export default function AddProduct() {
                           onChange={(e) => updateRow(row.key, "shop", e.target.value)}
                           className="!h-10"
                         >
-                          <option value="Shop 1">Shop 1</option>
-                          <option value="Shop 2">Shop 2</option>
+                          {SHOPS.map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
                         </Select>
                         <Input
                           aria-label="Starting quantity"

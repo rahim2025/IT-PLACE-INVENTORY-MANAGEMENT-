@@ -3,10 +3,11 @@ import { Expense, EXPENSE_CATEGORIES } from "../models/Expense.js";
 import { logActivity } from "../utils/logActivity.js";
 
 export const listExpenses = asyncHandler(async (req, res) => {
-  const { category, from, to, page = 1, limit = 15 } = req.query;
+  const { category, shop, from, to, page = 1, limit = 15 } = req.query;
 
   const filter = {};
   if (category) filter.category = category;
+  if (shop) filter.shop = shop;
   if (from || to) {
     filter.date = {};
     if (from) filter.date.$gte = new Date(from);
@@ -32,10 +33,11 @@ export const listExpenses = asyncHandler(async (req, res) => {
 });
 
 export const createExpense = asyncHandler(async (req, res) => {
-  const { category, amount, date, description, employee } = req.body;
+  const { category, shop, amount, date, description, employee } = req.body;
 
   const expense = await Expense.create({
     category,
+    shop: shop || undefined,
     amount,
     date: date || Date.now(),
     description,

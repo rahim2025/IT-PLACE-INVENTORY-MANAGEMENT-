@@ -15,6 +15,7 @@ import {
   useGetBrandsQuery,
 } from "../app/apiSlice";
 import { formatCurrency, formatDate, formatNumber } from "../lib/format";
+import { SHOPS } from "../lib/shops";
 
 export default function PurchaseHistory() {
   const [searchParams] = useSearchParams();
@@ -122,10 +123,11 @@ export default function PurchaseHistory() {
                     <option key={b._id} value={b.name}>{b.name}</option>
                   ))}
                 </Select>
-                <Select value={shop} onChange={(e) => setShop(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                <Select value={shop} onChange={(e) => setShop(e.target.value)} className="!h-8.5 w-36 !text-[13px]">
                   <option value="all">All shops</option>
-                  <option value="Shop 1">Shop 1</option>
-                  <option value="Shop 2">Shop 2</option>
+                  {SHOPS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </Select>
               </>
             }

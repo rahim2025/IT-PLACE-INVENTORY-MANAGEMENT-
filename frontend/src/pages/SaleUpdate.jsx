@@ -15,10 +15,10 @@ import ProductPicker from "../components/ui/ProductPicker";
 import { useGetProductsQuery, useGetSalesQuery, useCreateSaleMutation } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
 import { formatCurrency, formatDate, toLocalDateInput } from "../lib/format";
+import { SHOPS, SHOP_TONE } from "../lib/shops";
 
 const today = () => toLocalDateInput();
 const emptyItem = () => ({ productId: "", quantity: 1, unitPrice: "" });
-const SHOP_TONE = { "Shop 1": "neutral", "Shop 2": "rose" };
 
 function RecordSaleModal({ open, onClose }) {
   const dispatch = useDispatch();
@@ -123,8 +123,9 @@ function RecordSaleModal({ open, onClose }) {
           <Label htmlFor="sale-shop" hint="every item in this sale comes from its stock">Shop</Label>
           <Select id="sale-shop" value={shop} onChange={(e) => changeShop(e.target.value)}>
             <option value="" disabled>Select a shop</option>
-            <option value="Shop 1">Shop 1</option>
-            <option value="Shop 2">Shop 2</option>
+            {SHOPS.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </Select>
         </FieldGroup>
 
@@ -297,10 +298,11 @@ export default function SaleUpdate() {
                     Clear
                   </button>
                 )}
-                <Select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="!h-8.5 w-32 !text-[13px]">
+                <Select value={shopFilter} onChange={(e) => setShopFilter(e.target.value)} className="!h-8.5 w-36 !text-[13px]">
                   <option value="all">All shops</option>
-                  <option value="Shop 1">Shop 1</option>
-                  <option value="Shop 2">Shop 2</option>
+                  {SHOPS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </Select>
               </>
             }

@@ -9,6 +9,7 @@ import ProductPicker from "../components/ui/ProductPicker";
 import { useGetProductsQuery, useCreatePurchaseMutation } from "../app/apiSlice";
 import { pushed } from "../features/toast/toastSlice";
 import { toLocalDateInput } from "../lib/format";
+import { SHOPS } from "../lib/shops";
 
 const today = () => toLocalDateInput();
 
@@ -94,8 +95,9 @@ export default function PurchaseEntry() {
                   }}
                 >
                   <option value="all">All shops</option>
-                  <option value="Shop 1">Shop 1</option>
-                  <option value="Shop 2">Shop 2</option>
+                  {SHOPS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </Select>
               </FieldGroup>
 
